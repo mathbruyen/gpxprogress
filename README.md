@@ -9,9 +9,7 @@ Once the instance is set up (for example [through a docker container](https://gi
 * `HOST` - the host and port of the CouchDB server: `export HOST="http://127.0.0.1:8080"`
 * `PASSWORD` - the admin password to set: `export PASSWORD=testingftw`
 
-and run `./configure.sh` which configures the database and uploads the app to it.
-
-To redeploy, run `./clean.sh` with the same variables set and then rerun `./configure.sh`.
+and run `node index.js` which configures the database and uploads the app to it.
 
 ## Required tooling for deployment
 
