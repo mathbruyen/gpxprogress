@@ -10,8 +10,3 @@ Once the instance is set up (for example [through a docker container](https://gi
 * `PASSWORD` - the admin password to set: `export PASSWORD=testingftw`
 
 and run `node index.js` which configures the database and uploads the app to it.
-
-## Required tooling for deployment
-
-* [jq](http://stedolan.github.io/jq/)
-* [cURL](http://curl.haxx.se/)
