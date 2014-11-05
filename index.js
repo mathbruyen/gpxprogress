@@ -36,7 +36,6 @@ function clean(http, user, password) {
   return authenticated(http, user, password).then(function (auth) {
     return Promise.all([
       auth({ method : 'delete', url : '/trace' }).catch(console.log.bind(console, 'Cannot delete trace db')),
-      auth({ method : 'delete', url : '/plan' }).catch(console.log.bind(console, 'Cannot delete plan db')),
       auth({ method : 'delete', url : '/app' }).catch(console.log.bind(console, 'Cannot delete app db'))
     ]).then(function () {
       return auth({ method : 'delete', url : '/_config/admins/' + user }).catch(console.log.bind(console, 'Cannot delete admin'));
@@ -96,7 +95,7 @@ function bundleMethod(name) {
   return bundle(function (b) {
     b.require('./src/' + name, { expose : 'method' });
   }).then(function (content) {
-    return '(function () { ' + content + '; return require("method"); })()'
+    return '(function () { ' + content + '; return require("method"); })()';
   });
 }
 
@@ -180,7 +179,6 @@ function configure(http, user, password) {
     .then(function (auth) {
       return Promise.all([
         traceDb(auth),
-        auth({ method : 'put', url : '/plan' }),
         appDb(auth)
       ]);
     });
@@ -198,5 +196,5 @@ var user = 'mathieu';
 var password = process.env.PASSWORD;
 clean(db, user, password)
   .then(configure.bind(null, db, user, password))
-  //.then(console.log.bind(console, 'Done'))
+  .then(console.log.bind(console, 'Done'))
   .catch(console.error.bind(console));
