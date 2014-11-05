@@ -11,6 +11,11 @@
   "license": "MIT",
   "dependencies": {
     "axios": "^0.3.1",
-    "es6-promise": "^1.0.0"
+    "browserify": "^5.12.0",
+    "document-register-element": "^0.1.2",
+    "es6-promise": "^1.0.0",
+    "leaflet": "^0.7.3",
+    "mathsync": "^0.6.0",
+    "traceur": "0.0.62"
   }
 }

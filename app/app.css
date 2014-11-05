@@ -1,0 +1,10 @@
+
+trace-map {
+  display: block;
+}
+
+#tracemap {
+  height: 400px;
+  width: 100%;
+  outline: 1px solid green;
+}
