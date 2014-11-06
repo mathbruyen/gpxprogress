@@ -145,7 +145,8 @@ function traceDb(auth) {
         method : 'put',
         url : '/trace/_design/auth',
         headers : { 'Content-Type' : 'application/json' },
-        data : { 'validate_doc_update' : 'function (newDoc, oldDoc, userCtx) { if ((!userCtx) || userCtx.name !== "mathieu") { throw({ unauthorized: "Cannot modify documents" }); }}' }
+        // data : { 'validate_doc_update' : 'function (newDoc, oldDoc, userCtx) { if ((!userCtx) || userCtx.name !== "mathieu") { throw({ unauthorized: "Cannot modify documents" }); }}' }
+        data : { 'validate_doc_update' : 'function (newDoc, oldDoc, userCtx) {}' }
       });
     })
     .then(function () {
@@ -196,5 +197,5 @@ var user = 'mathieu';
 var password = process.env.PASSWORD;
 clean(db, user, password)
   .then(configure.bind(null, db, user, password))
-  .then(console.log.bind(console, 'Done'))
-  .catch(console.error.bind(console));
+  .then(function () {})
+  .then(console.log.bind(console, 'Done'), console.error.bind(console));
