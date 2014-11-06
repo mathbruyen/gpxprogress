@@ -59,10 +59,28 @@ function addMarker(doc) {
   document.getElementById('tracemap').appendChild(marker);
 }
 
+let followButton = document.getElementById('follow');
+let isFollowing = false;
+followButton.addEventListener('click', function () {
+  if (isFollowing) {
+    followButton.innerHTML = 'Start following';
+  } else {
+    followButton.innerHTML = 'Stop following';
+  }
+  isFollowing = !isFollowing;
+}, false);
+
+let map = document.getElementById('tracemap');
+let followTimestamp = 0;
 function localSave(doc, pending) {
   console.log('Adding point', doc);
   localStorage.setItem(doc.timestamp, JSON.stringify({ lat : doc.lat, lng : doc.lng, pending : pending }));
   addMarker(doc);
+  if (isFollowing && doc.timestamp > followTimestamp) {
+    followTimestamp = doc.timestamp;
+    map.setAttribute('lng', doc.lng);
+    map.setAttribute('lat', doc.lat);
+  }
 }
 
 for (var i = 0; i < localStorage.length; i++) {
@@ -137,7 +155,7 @@ function sync() {
 
 sync();
 
-let button = document.getElementById('push');
+let recordButton = document.getElementById('push');
 if ('geolocation' in navigator) {
   let watchID = null;
   let last;
@@ -145,12 +163,12 @@ if ('geolocation' in navigator) {
   let stopListening = function stopListening() {
     if (watchID !== null) {
       navigator.geolocation.clearWatch(watchID);
-      button.innerHTML = 'Start';
+      recordButton.innerHTML = 'Start recording';
       watchID = null;
     }
   };
 
-  document.getElementById('push').addEventListener('click', function () {
+  recordButton.addEventListener('click', function () {
     if (watchID !== null) {
       stopListening();
     } else {
@@ -161,12 +179,12 @@ if ('geolocation' in navigator) {
           last = current;
         }
       }, stopListening);
-      button.innerHTML = 'Stop';
+      recordButton.innerHTML = 'Stop recording';
     }
   }, false);
 } else {
-  button.setAttribute('disabled', true);
-  button.innerHTML = 'Geolocation not available';
+  recordButton.setAttribute('disabled', true);
+  recordButton.innerHTML = 'Geolocation not available';
 }
 
 var TraceMap = Object.create(HTMLElement.prototype);
@@ -180,12 +198,18 @@ TraceMap.createdCallback = function () {
   L.tileLayer('http://otile3.mqcdn.com/tiles/1.0.0/map/{z}/{x}/{y}.png', { attribution: 'Tiles Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a> <img src="http://developer.mapquest.com/content/osm/mq_logo.png">' }).addTo(this.map);
 
   this.map.on('moveend', e => {
-    this.setAttribute('lat', this.map.getCenter().lat);
-    this.setAttribute('lng', this.map.getCenter().lng);
+    if (!this.ignoreMoveEnd) {
+      this.setAttribute('lat', this.map.getCenter().lat);
+      this.setAttribute('lng', this.map.getCenter().lng);
+    }
+    delete this.ignoreMoveEnd;
   });
 
   this.map.on('zoomend', e => {
-    this.setAttribute('zoom', this.map.getZoom());
+    if (!this.ignoreMoveEnd) {
+      this.setAttribute('zoom', this.map.getZoom());
+    }
+    delete this.ignoreZoomEnd;
   });
 
   var lat = parseFloat(this.getAttribute('lat')) || 0;
@@ -201,18 +225,21 @@ TraceMap.attributeChangedCallback = function(attrName, oldVal, newVal) {
     let lat = parseFloat(newVal);
     if (!isNaN(lat) && (this.map.getCenter().lat !== lat)) {
       this.map.panTo([lat, this.map.getCenter().lng]);
+      this.ignoreMoveEnd = true;
     }
   }
   if (attrName === 'lng') {
     let lng = parseFloat(newVal);
     if (!isNaN(lng) && (this.map.getCenter().lng !== lng)) {
       this.map.panTo([this.map.getCenter().lat, lng]);
+      this.ignoreMoveEnd = true;
     }
   }
   if (attrName === 'zoom') {
     let zoom = parseInt(newVal, 10);
     if (!isNaN(zoom) && (zoom !== this.map.getZoom())) {
       this.map.setZoom(zoom);
+      this.ignoreZoomEnd = true;
     }
   }
 };
