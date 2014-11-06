@@ -1,3 +1,7 @@
+'use strict';
+/* jshint browser: true */
+/* global console */
+
 var L = require('leaflet');
 var axios = require('axios');
 var Promise = require('es6-promise').Promise;
@@ -117,7 +121,7 @@ function pull() {
 }
 
 function wait(ms) {
-  return new Promise(function (resolve, reject) {
+  return new Promise(function (resolve) {
     setTimeout(resolve, ms);
   });
 }
@@ -133,18 +137,18 @@ function sync() {
 
 sync();
 
+let button = document.getElementById('push');
 if ('geolocation' in navigator) {
   let watchID = null;
-  let button = document.getElementById('push');
   let last;
 
-  function stopListening() {
+  let stopListening = function stopListening() {
     if (watchID !== null) {
       navigator.geolocation.clearWatch(watchID);
       button.innerHTML = 'Start';
       watchID = null;
     }
-  }
+  };
 
   document.getElementById('push').addEventListener('click', function () {
     if (watchID !== null) {
@@ -190,7 +194,7 @@ TraceMap.createdCallback = function () {
 
   var zoom = parseInt(this.getAttribute('zoom'), 10) || 1;
   this.map.setZoom(zoom);
-}
+};
 
 TraceMap.attributeChangedCallback = function(attrName, oldVal, newVal) {
   if (attrName === 'lat') {
@@ -239,7 +243,7 @@ MapMarker.detachedCallback = function() {
   delete this.map;
 };
 
-MapMarker.attributeChangedCallback = function(attrName, oldVal, newVal) {
+MapMarker.attributeChangedCallback = function() {
   this.readAttributes();
 };
 
