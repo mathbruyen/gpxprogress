@@ -2,7 +2,7 @@
 
 var Promise = require('es6-promise').Promise;
 var fs = require('fs');
-var traceur = require('traceur');
+var to5 = require('6to5');
 var browserify = require('browserify');
 
 function http(host) {
@@ -102,7 +102,7 @@ function bundleMethod(name) {
 function compile(scriptName) {
   return readFile('src/' + scriptName)
     .then(function (src) {
-      return traceur.compile(src, { experimental : true });
+      return to5.transform(src).code;
     })
     .then(writeFile.bind(null, './src/traced-app.js'))
     .then(bundlePackage.bind(null, 'traced-app.js'));
@@ -134,7 +134,6 @@ function appDb(auth) {
     .then(attachAppContent.bind(null, auth, 'leaflet.css', 'text/css', readFile('node_modules/leaflet/dist/leaflet.css')))
     .then(attachAppContent.bind(null, auth, 'document-register-element.js', 'application/javascript', readFile('node_modules/document-register-element/build/document-register-element.js')))
     .then(attachAppContent.bind(null, auth, 'favicon.png', 'image/png', readFile('app/favicon.png', true)))
-    .then(attachAppContent.bind(null, auth, 'traceur-runtime.js', 'application/javascript', readFile('node_modules/traceur/bin/traceur-runtime.js')))
     .then(attachAppScript.bind(null, auth, 'app.js'));
 }
 
