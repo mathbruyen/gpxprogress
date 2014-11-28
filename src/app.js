@@ -5,6 +5,65 @@
 var L = require('leaflet');
 var axios = require('axios');
 var Promise = require('es6-promise').Promise;
+var Rx = require('rx/dist/rx.lite.js');
+
+function filterWithLatestCompliant(observable, accept) {
+  return observable.scan(null, function (acc, current) {
+    if (!acc || accept(acc.latest, current)) {
+      return { latest : current, compliant : true };
+    } else {
+      return { latest : acc.latest };
+    }
+  }).filter(function (acc) {
+    return !!acc.compliant;
+  }).map(function (acc) {
+    return acc.latest;
+  });
+}
+
+var gps = Rx.Observable.create(function (observer) {
+  var watchId = window.navigator.geolocation.watchPosition(function (loc) {
+    observer.onNext(loc);
+  }, function (err) {
+    observer.onError(err);
+  });
+
+  return function () {
+    window.navigator.geolocation.clearWatch(watchId);
+  };
+}).map(function (loc) {
+  return { timestamp : loc.timestamp, lat : loc.coords.latitude, lng : loc.coords.longitude };
+});
+
+var recordButton = (function () {
+  var active = false;
+  var button = document.getElementById('push');
+
+  if (!('geolocation' in navigator)) {
+    button.setAttribute('disabled', true);
+    button.innerHTML = 'Geolocation not available';
+    return Rx.observable.of(false);
+  }
+
+  function setLabel() {
+    button.innerHTML = active ? 'Stop recording' : 'Start recording';
+  }
+
+  setLabel();
+  return Rx.Observable.fromEvent(button, 'click').map(function () {
+    active = !active;
+    setLabel();
+    return active;
+  }).startWith(active);
+})();
+
+filterWithLatestCompliant(gps.pausable(recordButton), function (latest, current) {
+  return current.timestamp - latest.timestamp >= 60000 || L.latLng(current.lat, current.lng).distanceTo([latest.lat, latest.lng]) > 20;
+}).subscribe(function (position) {
+  localSave(position, true);
+}, function (err) {
+  console.error('Error with GPS', err);
+});
 
 function local(item, done) {
   var key, doc;
@@ -154,38 +213,6 @@ function sync() {
 }
 
 sync();
-
-let recordButton = document.getElementById('push');
-if ('geolocation' in navigator) {
-  let watchID = null;
-  let last;
-
-  let stopListening = function stopListening() {
-    if (watchID !== null) {
-      navigator.geolocation.clearWatch(watchID);
-      recordButton.innerHTML = 'Start recording';
-      watchID = null;
-    }
-  };
-
-  recordButton.addEventListener('click', function () {
-    if (watchID !== null) {
-      stopListening();
-    } else {
-      watchID = navigator.geolocation.watchPosition(function(position) {
-        var current = { timestamp : position.timestamp, lat : position.coords.latitude, lng : position.coords.longitude };
-        if (!last || L.latLng(current.lat, current.lng).distanceTo([last.lat, last.lng]) > 20) {
-          localSave(current, true);
-          last = current;
-        }
-      }, stopListening);
-      recordButton.innerHTML = 'Stop recording';
-    }
-  }, false);
-} else {
-  recordButton.setAttribute('disabled', true);
-  recordButton.innerHTML = 'Geolocation not available';
-}
 
 var TraceMap = Object.create(HTMLElement.prototype);
 
