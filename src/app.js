@@ -8,25 +8,22 @@ var Promise = require('es6-promise').Promise;
 var Rx = require('rx/dist/rx.lite.js');
 
 var recordButton = (function () {
-  var active = false;
   var button = document.getElementById('push');
 
-  if (!('geolocation' in navigator)) {
-    button.setAttribute('disabled', true);
+  if ('geolocation' in navigator) {
+    button.removeAttribute('disabled');
+    button.innerHTML = 'Start recording';
+    return Rx.Observable.fromEvent(button, 'click')
+      .scan(true, function (active) {
+        return !active;
+      })
+      .doAction(function (active) {
+        button.innerHTML = active ? 'Stop recording' : 'Start recording';
+      });
+  } else {
     button.innerHTML = 'Geolocation not available';
-    return Rx.observable.of(false);
+    return Rx.Observable.of(false);
   }
-
-  function setLabel() {
-    button.innerHTML = active ? 'Stop recording' : 'Start recording';
-  }
-
-  setLabel();
-  return Rx.Observable.fromEvent(button, 'click').map(function () {
-    active = !active;
-    setLabel();
-    return active;
-  }).startWith(active);
 })();
 
 var gps = Rx.Observable.create(function (observer) {
