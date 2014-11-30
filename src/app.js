@@ -7,34 +7,6 @@ var axios = require('axios');
 var Promise = require('es6-promise').Promise;
 var Rx = require('rx/dist/rx.lite.js');
 
-function filterWithLatestCompliant(observable, accept) {
-  return observable.scan(null, function (acc, current) {
-    if (!acc || accept(acc.latest, current)) {
-      return { latest : current, compliant : true };
-    } else {
-      return { latest : acc.latest };
-    }
-  }).filter(function (acc) {
-    return !!acc.compliant;
-  }).map(function (acc) {
-    return acc.latest;
-  });
-}
-
-var gps = Rx.Observable.create(function (observer) {
-  var watchId = window.navigator.geolocation.watchPosition(function (loc) {
-    observer.onNext(loc);
-  }, function (err) {
-    observer.onError(err);
-  });
-
-  return function () {
-    window.navigator.geolocation.clearWatch(watchId);
-  };
-}).map(function (loc) {
-  return { timestamp : loc.timestamp, lat : loc.coords.latitude, lng : loc.coords.longitude };
-});
-
 var recordButton = (function () {
   var active = false;
   var button = document.getElementById('push');
@@ -57,9 +29,29 @@ var recordButton = (function () {
   }).startWith(active);
 })();
 
-filterWithLatestCompliant(gps.pausable(recordButton), function (latest, current) {
-  return current.timestamp - latest.timestamp >= 60000 || L.latLng(current.lat, current.lng).distanceTo([latest.lat, latest.lng]) > 20;
-}).subscribe(function (position) {
+var gps = Rx.Observable.create(function (observer) {
+  var watchId = window.navigator.geolocation.watchPosition(
+    function (loc) {
+      observer.onNext(loc);
+    }, function (err) {
+      observer.onError(err);
+    }
+  );
+
+  return function () {
+    window.navigator.geolocation.clearWatch(watchId);
+  };
+});
+
+var points = gps.pausable(recordButton)
+  .map(function (loc) {
+    return { timestamp : loc.timestamp, lat : loc.coords.latitude, lng : loc.coords.longitude };
+  })
+  .distinctUntilChanged(function (x) { return x; }, function (latest, current) {
+    return current.timestamp - latest.timestamp >= 60000 || L.latLng(current.lat, current.lng).distanceTo([latest.lat, latest.lng]) > 20;
+  });
+
+points.subscribe(function (position) {
   localSave(position, true);
 }, function (err) {
   console.error('Error with GPS', err);
