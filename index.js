@@ -104,8 +104,8 @@ function compile(scriptName) {
     .then(function (src) {
       return to5.transform(src).code;
     })
-    .then(writeFile.bind(null, './src/traced-app.js'))
-    .then(bundlePackage.bind(null, 'traced-app.js'));
+    .then(writeFile.bind(null, './src/traced-' + scriptName))
+    .then(bundlePackage.bind(null, 'traced-' + scriptName));
 }
 
 function attachAppContent(auth, filename, mime, content) {
