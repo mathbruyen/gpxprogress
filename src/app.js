@@ -27,7 +27,7 @@ var gps = Rx.Observable.create(function (observer) {
   return () => window.navigator.geolocation.clearWatch(watchId);
 });
 
-var points = gps.pausable(recordButton)
+var records = gps.pausable(recordButton)
   .map(({ timestamp, coords : { latitude : lat, longitude : lng } }) => ({ timestamp, lat, lng }))
   .distinctUntilChanged(
     x => x,
@@ -35,21 +35,12 @@ var points = gps.pausable(recordButton)
         L.latLng(current.lat, current.lng).distanceTo([latest.lat, latest.lng]) > 20
   );
 
-function addMarker(doc) {
-  var marker = document.createElement('map-marker');
-  marker.id = 'tracepoint-' + doc.timestamp;
-  marker.setAttribute('lat', doc.lat);
-  marker.setAttribute('lng', doc.lng);
-  document.getElementById('tracemap').appendChild(marker);
-}
-
 function localSave(doc, pending) {
   console.log('Adding point', doc);
   localStorage.setItem(doc.timestamp, JSON.stringify({ lat : doc.lat, lng : doc.lng, pending : pending }));
-  addMarker(doc);
 }
 
-points.subscribe(position => localSave(position, true), err => console.error('Error with GPS', err));
+records.subscribe(position => localSave(position, true), err => console.error('Error with GPS', err));
 
 var local = Rx.Observable.create(function (observer) {
   for (var i = 0; i < localStorage.length; i++) {
@@ -59,6 +50,17 @@ var local = Rx.Observable.create(function (observer) {
     observer.onNext(doc);
   }
   observer.onCompleted();
+});
+
+// TODO add points added by synchronization
+var points = local.merge(records);
+
+points.subscribe(doc => {
+  var marker = document.createElement('map-marker');
+  marker.id = 'tracepoint-' + doc.timestamp;
+  marker.setAttribute('lat', doc.lat);
+  marker.setAttribute('lng', doc.lng);
+  document.getElementById('tracemap').appendChild(marker);
 });
 
 var localSynchronized = local.filter(pos => !pos.pending);
@@ -111,13 +113,6 @@ center.subscribe(({ lng, lat }) => {
   map.setAttribute('lng', lng);
   map.setAttribute('lat', lat);
 });
-
-for (var i = 0; i < localStorage.length; i++) {
-  let key = localStorage.key(i);
-  let doc = JSON.parse(localStorage.getItem(key));
-  doc.timestamp = parseFloat(key);
-  addMarker(doc);
-}
 
 function localDelete(doc) {
   console.log('Removing point', doc);
