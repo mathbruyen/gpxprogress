@@ -35,6 +35,20 @@ var points = gps.pausable(recordButton)
         L.latLng(current.lat, current.lng).distanceTo([latest.lat, latest.lng]) > 20
   );
 
+function addMarker(doc) {
+  var marker = document.createElement('map-marker');
+  marker.id = 'tracepoint-' + doc.timestamp;
+  marker.setAttribute('lat', doc.lat);
+  marker.setAttribute('lng', doc.lng);
+  document.getElementById('tracemap').appendChild(marker);
+}
+
+function localSave(doc, pending) {
+  console.log('Adding point', doc);
+  localStorage.setItem(doc.timestamp, JSON.stringify({ lat : doc.lat, lng : doc.lng, pending : pending }));
+  addMarker(doc);
+}
+
 points.subscribe(position => localSave(position, true), err => console.error('Error with GPS', err));
 
 function local(item, done) {
@@ -82,37 +96,23 @@ function login() {
   return axios({ url : '/_session', method : 'post', data : { name : 'mathieu', password : 'testing' }});
 }
 
-function addMarker(doc) {
-  var marker = document.createElement('map-marker');
-  marker.id = 'tracepoint-' + doc.timestamp;
-  marker.setAttribute('lat', doc.lat);
-  marker.setAttribute('lng', doc.lng);
-  document.getElementById('tracemap').appendChild(marker);
-}
+var followButton = (function () {
+  var button = document.getElementById('follow');
+  return Rx.Observable.fromEvent(button, 'click')
+    .scan(false, active => !active)
+    .doAction(active => button.innerHTML = active ? 'Stop following' : 'Start following');
+})();
 
-let followButton = document.getElementById('follow');
-let isFollowing = false;
-followButton.addEventListener('click', function () {
-  if (isFollowing) {
-    followButton.innerHTML = 'Start following';
-  } else {
-    followButton.innerHTML = 'Stop following';
-  }
-  isFollowing = !isFollowing;
-}, false);
+var center = points
+  .pausable(followButton)
+  .distinctUntilChanged(x => x, (latest, current) => current.timestamp > latest.timestamp);
 
 let map = document.getElementById('tracemap');
-let followTimestamp = 0;
-function localSave(doc, pending) {
-  console.log('Adding point', doc);
-  localStorage.setItem(doc.timestamp, JSON.stringify({ lat : doc.lat, lng : doc.lng, pending : pending }));
-  addMarker(doc);
-  if (isFollowing && doc.timestamp > followTimestamp) {
-    followTimestamp = doc.timestamp;
-    map.setAttribute('lng', doc.lng);
-    map.setAttribute('lat', doc.lat);
-  }
-}
+
+center.subscribe(({ lng, lat }) => {
+  map.setAttribute('lng', lng);
+  map.setAttribute('lat', lat);
+});
 
 for (var i = 0; i < localStorage.length; i++) {
   let key = localStorage.key(i);
@@ -196,7 +196,7 @@ TraceMap.createdCallback = function () {
   this.map = L.map(div);
   L.tileLayer('http://otile3.mqcdn.com/tiles/1.0.0/map/{z}/{x}/{y}.png', { attribution: 'Tiles Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a> <img src="http://developer.mapquest.com/content/osm/mq_logo.png">' }).addTo(this.map);
 
-  this.map.on('moveend', e => {
+  this.map.on('moveend', () => {
     if (!this.ignoreMoveEnd) {
       this.setAttribute('lat', this.map.getCenter().lat);
       this.setAttribute('lng', this.map.getCenter().lng);
@@ -204,7 +204,7 @@ TraceMap.createdCallback = function () {
     delete this.ignoreMoveEnd;
   });
 
-  this.map.on('zoomend', e => {
+  this.map.on('zoomend', () => {
     if (!this.ignoreMoveEnd) {
       this.setAttribute('zoom', this.map.getZoom());
     }
