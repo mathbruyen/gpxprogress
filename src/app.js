@@ -51,18 +51,17 @@ function localSave(doc, pending) {
 
 points.subscribe(position => localSave(position, true), err => console.error('Error with GPS', err));
 
-function local(item, done) {
-  var key, doc;
+var local = Rx.Observable.create(function (observer) {
   for (var i = 0; i < localStorage.length; i++) {
-    key = localStorage.key(i);
-    doc = JSON.parse(localStorage.getItem(key));
+    let key = localStorage.key(i);
+    let doc = JSON.parse(localStorage.getItem(key));
     doc.timestamp = parseFloat(key);
-    if (!doc.pending) {
-      item(doc);
-    }
+    observer.onNext(doc);
   }
-  done();
-}
+  observer.onCompleted();
+});
+
+var localSynchronized = local.filter(pos => !pos.pending);
 
 var remote = require('mathsync/json').newSummarizer(function (level) {
   return axios({
@@ -90,7 +89,7 @@ function deserialize(buffer) {
   return point;
 }
 
-var resolver = require('mathsync/skeleton').newResolver(local, remote, require('./serialize'), deserialize);
+var resolver = require('mathsync/observable').newResolver(localSynchronized, remote, require('./serialize'), deserialize);
 
 function login() {
   return axios({ url : '/_session', method : 'post', data : { name : 'mathieu', password : 'testing' }});
@@ -160,12 +159,8 @@ function push() {
 
 function pull() {
   return resolver().then(function (difference) {
-    difference.removed.forEach(function (doc) {
-      localDelete(doc);
-    });
-    difference.added.forEach(function (doc) {
-      localSave(doc);
-    });
+    difference.removed.forEach(localDelete);
+    difference.added.forEach(localSave);
   });
 }
 
