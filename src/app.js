@@ -1,5 +1,5 @@
 'use strict';
-/* jshint browser: true */
+/* jshint browser: true, esnext: true */
 /* global console */
 
 var L = require('leaflet');
@@ -14,12 +14,8 @@ var recordButton = (function () {
     button.removeAttribute('disabled');
     button.innerHTML = 'Start recording';
     return Rx.Observable.fromEvent(button, 'click')
-      .scan(true, function (active) {
-        return !active;
-      })
-      .doAction(function (active) {
-        button.innerHTML = active ? 'Stop recording' : 'Start recording';
-      });
+      .scan(false, active => !active)
+      .doAction(active => button.innerHTML = active ? 'Stop recording' : 'Start recording');
   } else {
     button.innerHTML = 'Geolocation not available';
     return Rx.Observable.of(false);
@@ -27,32 +23,19 @@ var recordButton = (function () {
 })();
 
 var gps = Rx.Observable.create(function (observer) {
-  var watchId = window.navigator.geolocation.watchPosition(
-    function (loc) {
-      observer.onNext(loc);
-    }, function (err) {
-      observer.onError(err);
-    }
-  );
-
-  return function () {
-    window.navigator.geolocation.clearWatch(watchId);
-  };
+  var watchId = window.navigator.geolocation.watchPosition(loc => observer.onNext(loc), err => observer.onError(err));
+  return () => window.navigator.geolocation.clearWatch(watchId);
 });
 
 var points = gps.pausable(recordButton)
-  .map(function (loc) {
-    return { timestamp : loc.timestamp, lat : loc.coords.latitude, lng : loc.coords.longitude };
-  })
-  .distinctUntilChanged(function (x) { return x; }, function (latest, current) {
-    return current.timestamp - latest.timestamp >= 60000 || L.latLng(current.lat, current.lng).distanceTo([latest.lat, latest.lng]) > 20;
-  });
+  .map(({ timestamp, coords : { latitude : lat, longitude : lng } }) => ({ timestamp, lat, lng }))
+  .distinctUntilChanged(
+    x => x,
+    (latest, current) => current.timestamp - latest.timestamp >= 60000 ||
+        L.latLng(current.lat, current.lng).distanceTo([latest.lat, latest.lng]) > 20
+  );
 
-points.subscribe(function (position) {
-  localSave(position, true);
-}, function (err) {
-  console.error('Error with GPS', err);
-});
+points.subscribe(position => localSave(position, true), err => console.error('Error with GPS', err));
 
 function local(item, done) {
   var key, doc;
