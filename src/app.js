@@ -81,12 +81,11 @@ var remote = require('mathsync/json').newSummarizer(function (level) {
 });
 
 function deserialize(buffer) {
-  var point = {};
   var dv = new DataView(buffer);
-  point.timestamp = dv.getFloat64(0);
-  point.lat = dv.getFloat64(Float64Array.BYTES_PER_ELEMENT);
-  point.lng = dv.getFloat64(2 * Float64Array.BYTES_PER_ELEMENT);
-  return point;
+  var timestamp = dv.getFloat64(0);
+  var lat = dv.getFloat64(Float64Array.BYTES_PER_ELEMENT);
+  var lng = dv.getFloat64(2 * Float64Array.BYTES_PER_ELEMENT);
+  return { timestamp, lat, lng };
 }
 
 var resolver = require('mathsync/observable').newResolver(localSynchronized, remote, require('./serialize'), deserialize);
