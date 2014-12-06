@@ -7,6 +7,7 @@ var axios = require('axios');
 var Promise = require('es6-promise').Promise;
 var Rx = require('rx/dist/rx.lite.js');
 
+// Button to enable/disable GPS tracking
 var recordButton = (function () {
   var button = document.getElementById('push');
 
@@ -22,13 +23,14 @@ var recordButton = (function () {
   }
 })();
 
+// Raw GPS sensor
 var gps = Rx.Observable.create(function (observer) {
   var watchId = window.navigator.geolocation.watchPosition(loc => observer.onNext(loc), err => observer.onError(err));
   return () => window.navigator.geolocation.clearWatch(watchId);
-});
+}).map(({ timestamp, coords : { latitude : lat, longitude : lng } }) => ({ timestamp, lat, lng }));
 
+// Throttled GPS sensor => emits only if position moved enought or if last point was recorded long ago
 var records = gps.pausable(recordButton)
-  .map(({ timestamp, coords : { latitude : lat, longitude : lng } }) => ({ timestamp, lat, lng }))
   .distinctUntilChanged(
     x => x,
     (latest, current) => current.timestamp - latest.timestamp >= 60000 ||
@@ -42,6 +44,7 @@ function localSave(doc, pending) {
 
 records.subscribe(position => localSave(position, true), err => console.error('Error with GPS', err));
 
+// Locally saved points and completes
 var local = Rx.Observable.create(function (observer) {
   for (var i = 0; i < localStorage.length; i++) {
     let key = localStorage.key(i);
@@ -52,6 +55,7 @@ var local = Rx.Observable.create(function (observer) {
   observer.onCompleted();
 });
 
+// Locally saved points initially followed by recorded and synchronized ones (never completes)
 // TODO add points added by synchronization
 var points = local.merge(records);
 
@@ -63,6 +67,7 @@ points.subscribe(doc => {
   document.getElementById('tracemap').appendChild(marker);
 });
 
+// Locally saved points safe for synchronization
 var localSynchronized = local.filter(pos => !pos.pending);
 
 var remote = require('mathsync/json').newSummarizer(function (level) {
@@ -96,6 +101,7 @@ function login() {
   return axios({ url : '/_session', method : 'post', data : { name : 'mathieu', password : 'testing' }});
 }
 
+// Button enabling/disabling following last point
 var followButton = (function () {
   var button = document.getElementById('follow');
   return Rx.Observable.fromEvent(button, 'click')
@@ -103,16 +109,14 @@ var followButton = (function () {
     .doAction(active => button.innerHTML = active ? 'Stop following' : 'Start following');
 })();
 
-var center = points
-  .pausable(followButton)
-  .distinctUntilChanged(x => x, (latest, current) => current.timestamp > latest.timestamp);
-
+// Moves map center
 let map = document.getElementById('tracemap');
-
-center.subscribe(({ lng, lat }) => {
-  map.setAttribute('lng', lng);
-  map.setAttribute('lat', lat);
-});
+points.pausable(followButton)
+  .distinctUntilChanged(x => x, (latest, current) => current.timestamp > latest.timestamp)
+  .subscribe(({ lng, lat }) => {
+    map.setAttribute('lng', lng);
+    map.setAttribute('lat', lat);
+  });
 
 function localDelete(doc) {
   console.log('Removing point', doc);
