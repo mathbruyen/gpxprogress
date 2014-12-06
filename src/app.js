@@ -55,20 +55,11 @@ var local = Rx.Observable.create(function (observer) {
   observer.onCompleted();
 });
 
-// Locally saved points initially followed by recorded and synchronized ones (never completes)
-// TODO add points added by synchronization
-var points = local.merge(records);
-
-points.subscribe(doc => {
-  var marker = document.createElement('map-marker');
-  marker.id = 'tracepoint-' + doc.timestamp;
-  marker.setAttribute('lat', doc.lat);
-  marker.setAttribute('lng', doc.lng);
-  document.getElementById('tracemap').appendChild(marker);
-});
-
 // Locally saved points safe for synchronization
 var localSynchronized = local.filter(pos => !pos.pending);
+
+var additions = new Rx.Subject();
+var deletions = new Rx.Subject();
 
 var remote = require('mathsync/json').newSummarizer(function (level) {
   return axios({
@@ -101,32 +92,6 @@ function login() {
   return axios({ url : '/_session', method : 'post', data : { name : 'mathieu', password : 'testing' }});
 }
 
-// Button enabling/disabling following last point
-var followButton = (function () {
-  var button = document.getElementById('follow');
-  return Rx.Observable.fromEvent(button, 'click')
-    .scan(false, active => !active)
-    .doAction(active => button.innerHTML = active ? 'Stop following' : 'Start following');
-})();
-
-// Moves map center
-let map = document.getElementById('tracemap');
-points.pausable(followButton)
-  .distinctUntilChanged(x => x, (latest, current) => current.timestamp > latest.timestamp)
-  .subscribe(({ lng, lat }) => {
-    map.setAttribute('lng', lng);
-    map.setAttribute('lat', lat);
-  });
-
-function localDelete(doc) {
-  console.log('Removing point', doc);
-  localStorage.removeItem(doc.timestamp);
-  var marker = document.getElementById('tracepoint-' + doc.timestamp);
-  if (marker) {
-    marker.parentNode.removeChild(marker);
-  }
-}
-
 function save(doc, triedLogin) {
   return axios({
     method : 'post',
@@ -157,8 +122,8 @@ function push() {
 
 function pull() {
   return resolver().then(function (difference) {
-    difference.removed.forEach(localDelete);
-    difference.added.forEach(localSave);
+    difference.removed.forEach(point => deletions.onNext(point));
+    difference.added.forEach(point => additions.onNext(point));
   });
 }
 
@@ -178,6 +143,45 @@ function sync() {
 }
 
 sync();
+
+additions.subscribe(doc => localSave(doc, false));
+
+deletions.subscribe(doc => {
+  console.log('Removing point', doc);
+  localStorage.removeItem(doc.timestamp);
+  var marker = document.getElementById('tracepoint-' + doc.timestamp);
+  if (marker) {
+    marker.parentNode.removeChild(marker);
+  }
+});
+
+// Locally saved points initially followed by recorded and synchronized ones (never completes)
+var points = local.merge(records, additions);
+
+points.subscribe(doc => {
+  var marker = document.createElement('map-marker');
+  marker.id = 'tracepoint-' + doc.timestamp;
+  marker.setAttribute('lat', doc.lat);
+  marker.setAttribute('lng', doc.lng);
+  document.getElementById('tracemap').appendChild(marker);
+});
+
+// Button enabling/disabling following last point
+var followButton = (function () {
+  var button = document.getElementById('follow');
+  return Rx.Observable.fromEvent(button, 'click')
+    .scan(false, active => !active)
+    .doAction(active => button.innerHTML = active ? 'Stop following' : 'Start following');
+})();
+
+// Moves map center
+let map = document.getElementById('tracemap');
+points.pausable(followButton)
+  .distinctUntilChanged(x => x, (latest, current) => current.timestamp > latest.timestamp)
+  .subscribe(({ lng, lat }) => {
+    map.setAttribute('lng', lng);
+    map.setAttribute('lat', lat);
+  });
 
 var TraceMap = Object.create(HTMLElement.prototype);
 
