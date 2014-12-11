@@ -31,6 +31,7 @@ var gps = Rx.Observable.create(function (observer) {
 
 // Throttled GPS sensor => emits only if position moved enought or if last point was recorded long ago
 var records = gps.pausable(recordButton)
+  .share()
   .distinctUntilChanged(
     x => x,
     (latest, current) => current.timestamp - latest.timestamp >= 60000 ||
