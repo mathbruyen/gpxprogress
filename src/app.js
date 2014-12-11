@@ -55,9 +55,8 @@ var local = Rx.Observable.create(function (observer) {
   }
   observer.onCompleted();
 });
-
-// Locally saved points safe for synchronization
 var localSynchronized = local.filter(pos => !pos.pending);
+var toSynchronize = local.filter(pos => !!pos.pending);
 
 var additions = new Rx.Subject();
 var deletions = new Rx.Subject();
@@ -103,22 +102,14 @@ function save(doc, triedLogin) {
     if (response.status === 401 && !triedLogin) {
       return login().then(save.bind(null, doc, true));
     }
-  });
+  }).then(() => doc);
 }
 
 function push() {
-  var promises = [];
-  var key, doc;
-  for (var i = 0; i < localStorage.length; i++) {
-    key = localStorage.key(i);
-    doc = JSON.parse(localStorage.getItem(key));
-    doc.timestamp = parseFloat(key);
-    if (doc.pending) {
-      console.log('Pushing point', doc);
-      promises.push(save(doc));
-    }
-  }
-  return Promise.all(promises);
+  return new Promise((resolve, reject) => {
+    toSynchronize.flatMap(save)
+      .subscribe(console.log.bind(console, 'Pushed point'), reject, resolve);
+  });
 }
 
 function pull() {
