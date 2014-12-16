@@ -38,28 +38,7 @@ var records = gps.pausable(recordButton)
         L.latLng(current.lat, current.lng).distanceTo([latest.lat, latest.lng]) > 20
   );
 
-function localSave(doc, pending) {
-  console.log('Adding point', doc);
-  localStorage.setItem(doc.timestamp, JSON.stringify({ lat : doc.lat, lng : doc.lng, pending : pending }));
-}
-
-records.subscribe(position => localSave(position, true), err => console.error('Error with GPS', err));
-
-// Locally saved points and completes
-var local = Rx.Observable.create(function (observer) {
-  for (var i = 0; i < localStorage.length; i++) {
-    let key = localStorage.key(i);
-    let doc = JSON.parse(localStorage.getItem(key));
-    doc.timestamp = parseFloat(key);
-    observer.onNext(doc);
-  }
-  observer.onCompleted();
-});
-var localSynchronized = local.filter(pos => !pos.pending);
-var toSynchronize = local.filter(pos => !!pos.pending);
-
-var additions = new Rx.Subject();
-var deletions = new Rx.Subject();
+records.subscribeOnError(err => console.error('Error with GPS', err));
 
 var remote = require('mathsync/json').newSummarizer(function (level) {
   return axios({
@@ -86,10 +65,36 @@ function deserialize(buffer) {
   return { timestamp, lat, lng };
 }
 
-var resolver = require('mathsync/observable').newResolver(localSynchronized, remote, require('./serialize'), deserialize);
-
 function login() {
   return axios({ url : '/_session', method : 'post', data : { name : 'mathieu', password : 'testing' }});
+}
+
+var additions = new Rx.Subject();
+var deletions = new Rx.Subject();
+
+function onNewPoint({ lat, lng, timestamp }) {
+  localStorage.setItem(timestamp, JSON.stringify({ lat, lng, pending : true }));
+  additions.onNext({ lat, lng, timestamp });
+}
+records.subscribe(onNewPoint);
+
+var local = Rx.Observable.create(function (observer) {
+  for (var i = 0; i < localStorage.length; i++) {
+    let key = localStorage.key(i);
+    let doc = JSON.parse(localStorage.getItem(key));
+    doc.timestamp = parseFloat(key);
+    observer.onNext(doc);
+  }
+  observer.onCompleted();
+});
+
+var confirmed = local.filter(pos => !pos.pending);
+var toConfirm = local.filter(pos => !!pos.pending).map(({ lat, lng, timestamp }) => ({ lat, lng, timestamp }));
+
+var resolver = require('mathsync/observable').newResolver(confirmed, remote, require('./serialize'), deserialize);
+
+function onConfirmPoint({ lat, lng, timestamp }) {
+  localStorage.setItem(timestamp, JSON.stringify({ lat, lng }));
 }
 
 function save(doc, triedLogin) {
@@ -98,63 +103,64 @@ function save(doc, triedLogin) {
     url : '/trace',
     headers : { 'Content-Type' : 'application/json' },
     data : { lat : doc.lat, lng : doc.lng, timestamp : doc.timestamp }
-  }).then(localSave.bind(null, doc, false), function (response) {
+  }).then(null, function (response) {
     if (response.status === 401 && !triedLogin) {
-      return login().then(save.bind(null, doc, true));
+      return login().then(() => save(doc, true));
+    } else {
+      // TODO more details
+      throw new Error('Failed to synchronize ' + doc);
     }
-  }).then(() => doc);
+  }).then(() => onConfirmPoint(doc)).then(() => doc);
 }
 
 function push() {
   return new Promise((resolve, reject) => {
-    toSynchronize.flatMap(save)
-      .subscribe(console.log.bind(console, 'Pushed point'), reject, resolve);
+    toConfirm.flatMap(save).subscribe(doc => console.log('Pushed point', doc), reject, resolve);
   });
+}
+
+function onSyncPoint(doc) {
+  onConfirmPoint(doc);
+  additions.onNext(doc);
+}
+
+function onDeletePoint({ lat, lng, timestamp }) {
+  localStorage.removeItem(timestamp);
+  deletions.onNext({ lat, lng, timestamp });
 }
 
 function pull() {
   return resolver().then(function (difference) {
-    difference.removed.forEach(point => deletions.onNext(point));
-    difference.added.forEach(point => additions.onNext(point));
+    difference.removed.forEach(onDeletePoint);
+    difference.added.forEach(onSyncPoint);
   });
 }
 
-function wait(ms) {
-  return new Promise(function (resolve) {
-    setTimeout(resolve, ms);
-  });
-}
-
-function sync() {
-  console.log('Synchronization starting');
-  return push()
+var mutex = Promise.resolve();
+function start() {
+  mutex = mutex
+    .then(() => console.log('Synchronization starting'))
+    .then(push)
     .then(pull)
-    .then(console.log.bind(console, 'Synchronization finished'), console.error.bind(console, 'Failed to synchronize:'))
-    .then(wait.bind(null, 120000))
-    .then(sync);
+    .then(() => console.log('Synchronization finished'), err => console.error('Failed to synchronize:', err));
 }
 
-sync();
+Rx.Observable.interval(120000).subscribe(start);
 
-additions.subscribe(doc => localSave(doc, false));
-
-deletions.subscribe(doc => {
-  console.log('Removing point', doc);
-  localStorage.removeItem(doc.timestamp);
-  var marker = document.getElementById('tracepoint-' + doc.timestamp);
+deletions.subscribe(({ timestamp }) => {
+  var marker = document.getElementById('tracepoint-' + timestamp);
   if (marker) {
     marker.parentNode.removeChild(marker);
   }
 });
 
-// Locally saved points initially followed by recorded and synchronized ones (never completes)
-var points = local.merge(records, additions);
+var points = additions.merge(local);
 
-points.subscribe(doc => {
+points.subscribe(({ lat, lng, timestamp }) => {
   var marker = document.createElement('map-marker');
-  marker.id = 'tracepoint-' + doc.timestamp;
-  marker.setAttribute('lat', doc.lat);
-  marker.setAttribute('lng', doc.lng);
+  marker.id = 'tracepoint-' + timestamp;
+  marker.setAttribute('lat', lat);
+  marker.setAttribute('lng', lng);
   document.getElementById('tracemap').appendChild(marker);
 });
 
