@@ -10,13 +10,5 @@
   "author": "Mathieu Bruyen <code@mais-h.eu>",
   "license": "MIT",
   "dependencies": {
-    "6to5": "^1.10.12",
-    "axios": "^0.4.1",
-    "browserify": "^5.12.0",
-    "document-register-element": "^0.1.2",
-    "es6-promise": "^1.0.0",
-    "leaflet": "^0.7.3",
-    "mathsync": "^0.6.2",
-    "rx": "^2.3.14"
   }
 }
