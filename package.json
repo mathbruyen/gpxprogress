@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "build": "NODE_ENV=production webpack",
-    "watch": "NODE_ENV=development webpack-dev-server --content-base dist/"
+    "watch": "NODE_ENV=development webpack-dev-server --content-base dist/ --host 0.0.0.0 --port 8080"
   },
   "author": "Mathieu Bruyen <code@mais-h.eu>",
   "license": "MIT",
