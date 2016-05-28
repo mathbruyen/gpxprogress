@@ -15,15 +15,15 @@ npm run watch
 npm run build
 ```
 
-Alternatively, Docker based environment (beware that this requires no `node_modules` folder exist and will leave an invalid symbolic link after it runs):
+Alternatively, Docker based environment:
 
 ```
 # Prepare image with dependencies installed
 docker build -f Dockerfile.build -t gpxprogress .
 
 # Dev server
-docker run --rm -p 8080:8080 -v $(pwd):/gpxprogress -it gpxprogress watch
+docker run --rm -p 8080:8080 -v $(pwd)/src:/gpxprogress/src -it gpxprogress watch
 
 # Build of frontend resources
-docker run --rm -p 8080:8080 -v $(pwd):/gpxprogress -it gpxprogress build
+docker run --rm -v $(pwd)/dist:/gpxprogress/dist gpxprogress build
 ```

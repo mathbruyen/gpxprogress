@@ -1,13 +1,11 @@
 FROM node:6.2.0
 
-WORKDIR /gpxprogress.build
-COPY package.json /gpxprogress.build/
+WORKDIR /gpxprogress
+COPY package.json /gpxprogress/
 RUN npm install
 
-COPY run.sh /run.sh
-RUN chmod 755 /run.sh
+COPY webpack.config.js /gpxprogress/
+COPY /src /gpxprogress/src
 
-WORKDIR /gpxprogress
-
-ENTRYPOINT ["sh", "/run.sh"]
+ENTRYPOINT ["npm", "run"]
 CMD ["build"]
