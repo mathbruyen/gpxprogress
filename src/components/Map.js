@@ -5,52 +5,74 @@ require('../styles/map.css');
 // Zoom starts from 0 for which there is a single tile
 // Each time zoom increases the x and y number of tiles doubles
 
-const RESOLUTION = 1000;
+const RESOLUTION = 10000000;
 const MAX_LATITUDE = 90;
 const MAX_LONGITUDE = 180;
+const EARTH_RADIUS = 6378137;
+
+function log2(x) {
+  return Math.log(x) / Math.LN2;
+}
 
 function latToY(lat) {
   // Spherical mercator
-  const sin = Math.sin(lat * Math.PI / 180);
-  const spherical = Math.log((1 + sin) / (1 - sin)) / (2 * Math.PI);
-  return - RESOLUTION * Math.min(Math.max(spherical, -1), 1) / 2;
+  const sin = Math.sin(lat * Math.PI / 180);// [-90, 90] -> [-1, 1]
+  const spherical = Math.log((1 + sin) / (1 - sin));// [-90, -85, 85, 90] -> [-Infinity, -2 * PI, 2 * PI, Infinity]
+  const inRange = Math.min(Math.max(spherical / (2 * Math.PI), -1), 1);// [-90, -85, 85, 90] -> [-1, -1, 1, 1]
+  return - RESOLUTION * inRange / 2;// [-90, -85, 85, 90] -> [RESOLUTION / 2, RESOLUTION / 2, - RESOLUTION / 2, - RESOLUTION / 2]
 }
 
 function lngToX(lng) {
-  return (RESOLUTION * lng) / (MAX_LONGITUDE * 2);
+  // Linear
+  return (RESOLUTION * lng) / (MAX_LONGITUDE * 2);// [-180, 180] -> [- RESOLUTION / 2, RESOLUTION / 2]
 }
 
 function powerOf2(exponent) {
   return Math.round(Math.pow(2, exponent));
 }
 
+function metersToSize(meters) {
+  // Using longitude as basis: 2 * PI * EARTH_RADIUS -> RESOLUTION
+  return meters * RESOLUTION / (EARTH_RADIUS * Math.PI * 2);
+}
+
 function getTilesRange(start, length, tiles) {
-  return [
-    Math.ceil((start * tiles / RESOLUTION) - 1 + (tiles / 2)),
-    Math.floor((start * tiles / RESOLUTION) + (length * tiles / RESOLUTION) + (tiles / 2))
-  ];
+  // width = (RESOLUTION / tiles)
+  // x = (n * width) - (RESOLUTION / 2)
+
+  // x + width >= start
+  let first = Math.ceil((start * tiles / RESOLUTION) - 1 + (tiles / 2));
+
+  // x <= start + length
+  let last = Math.floor(((start + length) * tiles / RESOLUTION) + (tiles / 2));
+
+  return [first, last];
 }
 
 class Map extends Component {
 
   render() {
-    // TODO zoom could be devised from full bounds and actual svg size
     // TODO handle maps displayed on tiles edge
-    let { zoom, topLeftLat, topLeftLng, bottomRightLat, bottomRightLng, children } = this.props;
+    let { width, topLeftLat, topLeftLng, bottomRightLat, bottomRightLng, children } = this.props;
+
+    // Displayed part coordinates
     let topLeftX = lngToX(topLeftLng);
     let topLeftY = latToY(topLeftLat);
     let bottomRightX = lngToX(bottomRightLng);
     let bottomRightY = latToY(bottomRightLat);
-    let height = bottomRightY - topLeftY;
-    let width = bottomRightX - topLeftX;
-    let configuredChildren = React.Children.map(children, (c) => React.cloneElement(c, { mapProps : this.props }));
-    return React.createElement('svg', { width, height, viewBox : `${topLeftX} ${topLeftY} ${width} ${height}` }, configuredChildren);
+    let viewBox = `${topLeftX} ${topLeftY} ${bottomRightX - topLeftX} ${bottomRightY - topLeftY}`;
+
+    // Physical height
+    let height = width * (bottomRightY - topLeftY) / (bottomRightX - topLeftX);
+
+    let configuredChildren = React.Children.map(children, (c) => React.cloneElement(c, { __map : this }));
+    return React.createElement('svg', { width, height, viewBox }, configuredChildren);
   }
 
 }
 
 Map.propTypes = {
-  zoom : PropTypes.number.isRequired,
+  width : PropTypes.number.isRequired, // TODO either give width, height or diagonal size
   topLeftLat : PropTypes.number.isRequired,
   topLeftLng : PropTypes.number.isRequired,
   bottomRightLat : PropTypes.number.isRequired,
@@ -60,20 +82,23 @@ Map.propTypes = {
 class TileLayer extends Component {
 
   render() {
-    let { url, mapProps } = this.props;
-    let { zoom, topLeftLat, topLeftLng, bottomRightLat, bottomRightLng, children } = mapProps;
+    let { url, tilePixels, minZoom, maxZoom, __map } = this.props;
+    let { width, topLeftLat, topLeftLng, bottomRightLat, bottomRightLng } = __map.props;
+
+    let percent = (bottomRightLng - topLeftLng) / (2 * MAX_LONGITUDE);
+    let zoom = Math.max(minZoom, Math.min(maxZoom, Math.ceil(log2(width / (tilePixels * percent)))));
 
     let side = powerOf2(zoom);
 
     let topLeftX = lngToX(topLeftLng);
     let bottomRightX = lngToX(bottomRightLng);
-    let width = bottomRightX - topLeftX;
-    let xRange = getTilesRange(topLeftX, width, side);
+    let mapWidth = bottomRightX - topLeftX;
+    let xRange = getTilesRange(topLeftX, mapWidth, side);
 
     let topLeftY = latToY(topLeftLat);
     let bottomRightY = latToY(bottomRightLat);
-    let height = bottomRightY - topLeftY;
-    let yRange = getTilesRange(topLeftY, height, side);
+    let mapHeight = bottomRightY - topLeftY;
+    let yRange = getTilesRange(topLeftY, mapHeight, side);
 
     let tiles = [];
     let tileSize = RESOLUTION / side;
@@ -95,6 +120,9 @@ class TileLayer extends Component {
 }
 
 TileLayer.propTypes = {
+  minZoom : PropTypes.number.isRequired,
+  maxZoom : PropTypes.number.isRequired,
+  tilePixels : PropTypes.number.isRequired,
   url : PropTypes.func.isRequired
 }
 
@@ -102,8 +130,7 @@ class Disc extends Component {
 
   render() {
     let { lat, lng, r } = this.props;
-    // TODO how is the user supposed to give a size? (depends on svg end size and RESOLUTION)
-    return React.createElement('circle', { cx : lngToX(lng), cy : latToY(lat), r, fill : 'red' })
+    return React.createElement('circle', { cx : lngToX(lng), cy : latToY(lat), r : metersToSize(r), fill : 'red' })
   }
 
 }
@@ -117,7 +144,7 @@ Disc.propTypes = {
 class Path extends Component {
 
   render() {
-    let { points } = this.props;
+    let { points, w } = this.props;
     let d = points.map((point, idx) => {
       let x = lngToX(point[1]);
       let y = latToY(point[0]);
@@ -127,13 +154,14 @@ class Path extends Component {
         return `L${x} ${y}`;
       }
     }).join(' ');
-    return React.createElement('path', { d, stroke : 'red', fill : 'none' })
+    return React.createElement('path', { d, strokeWidth : metersToSize(w), stroke : 'red', fill : 'none' });
   }
 
 }
 
 Path.propTypes = {
   points : PropTypes.array.isRequired,
+  w : PropTypes.number.isRequired,
 }
 
 export { Map, TileLayer, Path, Disc };
