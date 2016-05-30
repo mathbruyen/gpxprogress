@@ -1,9 +1,12 @@
+/**
+ * Reactive/isomorphic maps.
+ *
+ * TODO: auto bounded map? (asking to its children for required bounds)
+ * TODO: centered map?
+ */
 import React, { Component, PropTypes } from 'react';
 
 require('../styles/map.css');
-
-// Zoom starts from 0 for which there is a single tile
-// Each time zoom increases the x and y number of tiles doubles
 
 const RESOLUTION = 10000000;
 const MAX_LATITUDE = 90;
@@ -49,56 +52,92 @@ function getTilesRange(start, length, tiles) {
   return [first, last];
 }
 
-class Map extends Component {
+class MapConfiguration {
+
+  constructor(topLeftLat, topLeftLng, bottomRightLat, bottomRightLng, width) {
+    this.topLeftLng = topLeftLng;
+    this.topLeftLat = topLeftLat;
+    this.bottomRightLng = bottomRightLng;
+    this.bottomRightLat = bottomRightLat;
+
+    this.width = width;
+
+    this.topLeftX = lngToX(topLeftLng);
+    this.topLeftY = latToY(topLeftLat);
+    this.bottomRightX = lngToX(bottomRightLng);
+    this.bottomRightY = latToY(bottomRightLat);
+  }
+
+  get mapWidth() {
+    return this.bottomRightX - this.topLeftX;
+  }
+
+  get mapHeight() {
+    return this.bottomRightY - this.topLeftY;
+  }
+
+  get aspectRatio() {
+    return (this.bottomRightY - this.topLeftY) / (this.bottomRightX - this.topLeftX);
+  }
+
+}
+
+/**
+ * Map defined by its bounds (top-left and bottom-right corners)
+ */
+class BoundedMap extends Component {
 
   render() {
     // TODO handle maps displayed on tiles edge
     let { width, topLeftLat, topLeftLng, bottomRightLat, bottomRightLng, children } = this.props;
+    let config = new MapConfiguration(topLeftLat, topLeftLng, bottomRightLat, bottomRightLng, width);
 
     // Displayed part coordinates
-    let topLeftX = lngToX(topLeftLng);
-    let topLeftY = latToY(topLeftLat);
-    let bottomRightX = lngToX(bottomRightLng);
-    let bottomRightY = latToY(bottomRightLat);
-    let viewBox = `${topLeftX} ${topLeftY} ${bottomRightX - topLeftX} ${bottomRightY - topLeftY}`;
+    let viewBox = `${config.topLeftX} ${config.topLeftY} ${config.mapWidth} ${config.mapHeight}`;
 
     // Physical height
-    let height = width * (bottomRightY - topLeftY) / (bottomRightX - topLeftX);
+    let height = width * config.aspectRatio;
 
-    let configuredChildren = React.Children.map(children, (c) => React.cloneElement(c, { __map : this }));
+    let configuredChildren = React.Children.map(children, (c) => React.cloneElement(c, { __mapConfig : config }));
     return React.createElement('svg', { width, height, viewBox }, configuredChildren);
   }
 
 }
 
-Map.propTypes = {
-  width : PropTypes.number.isRequired, // TODO either give width, height or diagonal size
+BoundedMap.propTypes = {
+  /**
+   * Expected width in pixels of the final element.
+   *
+   * TODO: allow to provide height or diagonal?
+   */
+  width : PropTypes.number.isRequired,
+
+  /**
+   * Top left corner.
+   */
   topLeftLat : PropTypes.number.isRequired,
   topLeftLng : PropTypes.number.isRequired,
+
+  /**
+   * Bottom right corner.
+   */
   bottomRightLat : PropTypes.number.isRequired,
   bottomRightLng : PropTypes.number.isRequired
 }
 
+// TODO manage tiles directly in map elements? (avoids having map injecting properties in its children)
 class TileLayer extends Component {
 
   render() {
-    let { url, tilePixels, minZoom, maxZoom, __map } = this.props;
-    let { width, topLeftLat, topLeftLng, bottomRightLat, bottomRightLng } = __map.props;
+    let { url, tilePixels, minZoom, maxZoom, __mapConfig } = this.props;
 
-    let percent = (bottomRightLng - topLeftLng) / (2 * MAX_LONGITUDE);
-    let zoom = Math.max(minZoom, Math.min(maxZoom, Math.ceil(log2(width / (tilePixels * percent)))));
+    // Zoom 0 has a single tile for the whole world, each time zoom increases the x and y number of tiles doubles
+    let percent = (__mapConfig.bottomRightLng - __mapConfig.topLeftLng) / (2 * MAX_LONGITUDE);
+    let zoom = Math.max(minZoom, Math.min(maxZoom, Math.ceil(log2(__mapConfig.width / (tilePixels * percent)))));
 
     let side = powerOf2(zoom);
-
-    let topLeftX = lngToX(topLeftLng);
-    let bottomRightX = lngToX(bottomRightLng);
-    let mapWidth = bottomRightX - topLeftX;
-    let xRange = getTilesRange(topLeftX, mapWidth, side);
-
-    let topLeftY = latToY(topLeftLat);
-    let bottomRightY = latToY(bottomRightLat);
-    let mapHeight = bottomRightY - topLeftY;
-    let yRange = getTilesRange(topLeftY, mapHeight, side);
+    let xRange = getTilesRange(__mapConfig.topLeftX, __mapConfig.mapWidth, side);
+    let yRange = getTilesRange(__mapConfig.topLeftY, __mapConfig.mapHeight, side);
 
     let tiles = [];
     let tileSize = RESOLUTION / side;
@@ -120,10 +159,25 @@ class TileLayer extends Component {
 }
 
 TileLayer.propTypes = {
+  /**
+   * Computing size URL.
+   *
+   * @parameter zoom the requested zoom level
+   * @param x the tile x coordinate (from 0 to 2^zoom - 1)
+   * @param y the tile y coordinate (from 0 to 2^zoom - 1)
+   */
+  url : PropTypes.func.isRequired,
+
+  /**
+   * Available zoom range.
+   */
   minZoom : PropTypes.number.isRequired,
   maxZoom : PropTypes.number.isRequired,
-  tilePixels : PropTypes.number.isRequired,
-  url : PropTypes.func.isRequired
+
+  /**
+   * The size of a single tile (used to compute best zoom level).
+   */
+  tilePixels : PropTypes.number.isRequired
 }
 
 class Disc extends Component {
@@ -136,8 +190,15 @@ class Disc extends Component {
 }
 
 Disc.propTypes = {
+  /**
+   * Disc center.
+   */
   lat : PropTypes.number.isRequired,
   lng : PropTypes.number.isRequired,
+
+  /**
+   * Radius of the disc in meters.
+   */
   r : PropTypes.number.isRequired
 }
 
@@ -160,8 +221,15 @@ class Path extends Component {
 }
 
 Path.propTypes = {
+  /**
+   * Points as an array of [lat, lng] items.
+   */
   points : PropTypes.array.isRequired,
+
+  /**
+   * Line width of the path in meters.
+   */
   w : PropTypes.number.isRequired,
 }
 
-export { Map, TileLayer, Path, Disc };
+export { BoundedMap, TileLayer, Path, Disc };

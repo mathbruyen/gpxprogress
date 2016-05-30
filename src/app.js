@@ -1,7 +1,7 @@
 import { createStore } from 'redux';
 import ReactDOM from 'react-dom';
 import React from 'react';
-import { Map, TileLayer, Path, Disc } from './components/Map';
+import { BoundedMap, TileLayer, Path, Disc } from './components/Map';
 
 require('./styles/app.css');
 
@@ -29,7 +29,7 @@ window.onload = function () {
     let { d, lat, lng } = store.getState();
     ReactDOM.render(
       React.createElement('div', {},
-        React.createElement(Map, { width : 400, topLeftLat : lat + d, topLeftLng : lng - d, bottomRightLat : lat - d, bottomRightLng : lng + d },
+        React.createElement(BoundedMap, { width : 400, topLeftLat : lat + d, topLeftLng : lng - d, bottomRightLat : lat - d, bottomRightLng : lng + d },
           React.createElement(TileLayer, { maxZoom : 17, minZoom : 0, tilePixels : 256, url : getTileUrl }),
           React.createElement(Disc, { lat, lng, r : 50 }),
           React.createElement(Path, { w : 50, points : [
