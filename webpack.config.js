@@ -22,7 +22,7 @@ function buildChunkName(base) {
 module.exports = {
   entry: {
     app: './src/app.js',
-    vendor: ['react', 'react-dom', 'redux'],
+    vendor: ['react', 'react-dom', 'redux', 'immutable'],
   },
   output: {
     path: './dist',

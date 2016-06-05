@@ -5,6 +5,7 @@
  * TODO: centered map?
  */
 import React, { Component, PropTypes } from 'react';
+import Immutable from 'immutable';
 
 require('../styles/map.css');
 
@@ -52,20 +53,22 @@ function getTilesRange(start, length, tiles) {
   return [first, last];
 }
 
+const Point = Immutable.Record({ lat : 0, lng : 0 });
+
 class MapConfiguration {
 
-  constructor(topLeftLat, topLeftLng, bottomRightLat, bottomRightLng, width) {
-    this.topLeftLng = topLeftLng;
-    this.topLeftLat = topLeftLat;
-    this.bottomRightLng = bottomRightLng;
-    this.bottomRightLat = bottomRightLat;
+  constructor(topLeft, bottomRight, width) {
+    this.topLeftLng = topLeft.lng;
+    this.topLeftLat = topLeft.lat;
+    this.bottomRightLng = bottomRight.lng;
+    this.bottomRightLat = bottomRight.lat;
 
     this.width = width;
 
-    this.topLeftX = lngToX(topLeftLng);
-    this.topLeftY = latToY(topLeftLat);
-    this.bottomRightX = lngToX(bottomRightLng);
-    this.bottomRightY = latToY(bottomRightLat);
+    this.topLeftX = lngToX(this.topLeftLng);
+    this.topLeftY = latToY(this.topLeftLat);
+    this.bottomRightX = lngToX(this.bottomRightLng);
+    this.bottomRightY = latToY(this.bottomRightLat);
   }
 
   get mapWidth() {
@@ -84,13 +87,16 @@ class MapConfiguration {
 
 /**
  * Map defined by its bounds (top-left and bottom-right corners)
+ *
+ * TODO handle maps displayed on tiles edge
  */
 class BoundedMap extends Component {
 
   render() {
-    // TODO handle maps displayed on tiles edge
-    let { width, topLeftLat, topLeftLng, bottomRightLat, bottomRightLng, children } = this.props;
-    let config = new MapConfiguration(topLeftLat, topLeftLng, bottomRightLat, bottomRightLng, width);
+    // Map configuration width actual size if already measured
+    let { width, topLeft, bottomRight, children } = this.props;
+    let config = new MapConfiguration(topLeft, bottomRight, width);
+
 
     // Displayed part coordinates
     let viewBox = `${config.topLeftX} ${config.topLeftY} ${config.mapWidth} ${config.mapHeight}`;
@@ -115,14 +121,12 @@ BoundedMap.propTypes = {
   /**
    * Top left corner.
    */
-  topLeftLat : PropTypes.number.isRequired,
-  topLeftLng : PropTypes.number.isRequired,
+  topLeft : PropTypes.instanceOf(Point).isRequired,
 
   /**
    * Bottom right corner.
    */
-  bottomRightLat : PropTypes.number.isRequired,
-  bottomRightLng : PropTypes.number.isRequired
+  bottomRight : PropTypes.instanceOf(Point).isRequired
 }
 
 // TODO manage tiles directly in map elements? (avoids having map injecting properties in its children)
@@ -183,8 +187,11 @@ TileLayer.propTypes = {
 class Disc extends Component {
 
   render() {
-    let { lat, lng, r } = this.props;
-    return React.createElement('circle', { cx : lngToX(lng), cy : latToY(lat), r : metersToSize(r), fill : 'red' })
+    let { center, radius } = this.props;
+    let cx = lngToX(center.lng);
+    let cy = latToY(center.lat);
+    let r = metersToSize(radius);
+    return React.createElement('circle', { cx, cy, r, fill : 'red' });
   }
 
 }
@@ -193,22 +200,24 @@ Disc.propTypes = {
   /**
    * Disc center.
    */
-  lat : PropTypes.number.isRequired,
-  lng : PropTypes.number.isRequired,
+  center : PropTypes.instanceOf(Point).isRequired,
 
   /**
    * Radius of the disc in meters.
    */
-  r : PropTypes.number.isRequired
+  radius : PropTypes.number.isRequired
 }
 
 class Path extends Component {
 
   render() {
     let { points, w } = this.props;
+    if (points.size < 2) {
+      return null;
+    }
     let d = points.map((point, idx) => {
-      let x = lngToX(point[1]);
-      let y = latToY(point[0]);
+      let x = lngToX(point.lng);
+      let y = latToY(point.lat);
       if (idx == 0) {
         return `M${x} ${y}`;
       } else {
@@ -218,13 +227,18 @@ class Path extends Component {
     return React.createElement('path', { d, strokeWidth : metersToSize(w), stroke : 'red', fill : 'none' });
   }
 
+  shouldComponentUpdate(nextProps) {
+    let { points, w } = this.props;
+    return nextProps.w !== w || nextProps.points !== points;
+  }
+
 }
 
 Path.propTypes = {
   /**
-   * Points as an array of [lat, lng] items.
+   * Points as a List<Point> items.
    */
-  points : PropTypes.array.isRequired,
+  points : PropTypes.instanceOf(Immutable.List).isRequired,
 
   /**
    * Line width of the path in meters.
@@ -232,4 +246,4 @@ Path.propTypes = {
   w : PropTypes.number.isRequired,
 }
 
-export { BoundedMap, TileLayer, Path, Disc };
+export { BoundedMap, TileLayer, Path, Disc, Point };
