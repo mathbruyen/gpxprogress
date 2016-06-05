@@ -6,6 +6,7 @@
  */
 import React, { Component, PropTypes } from 'react';
 import Immutable from 'immutable';
+import ReactDOM from 'react-dom';
 
 require('../styles/map.css');
 
@@ -94,7 +95,8 @@ class BoundedMap extends Component {
 
   render() {
     // Map configuration width actual size if already measured
-    let { width, topLeft, bottomRight, children } = this.props;
+    let { widthHint, topLeft, bottomRight, children } = this.props;
+    let width = (this.state && this.state.width) || widthHint;
     let config = new MapConfiguration(topLeft, bottomRight, width);
 
 
@@ -108,15 +110,33 @@ class BoundedMap extends Component {
     return React.createElement('svg', { width, height, viewBox }, configuredChildren);
   }
 
+  componentDidMount() {
+    this.__measure();
+  }
+
+  componentWillReceiveProps() {
+    // TODO watch for element size changes rather than waiting for properties change
+    this.__measure();
+  }
+
+  __measure() {
+    let node = ReactDOM.findDOMNode(this);
+    let style = window.getComputedStyle(node, null).getPropertyValue('width');
+    let measured = parseInt(style.substring(-2), 10);
+    this.setState({ width : measured });
+  }
+
 }
 
 BoundedMap.propTypes = {
   /**
    * Expected width in pixels of the final element.
    *
+   * Used for static and initial rendering, then state is used to track the actual element width and adjust.
+   *
    * TODO: allow to provide height or diagonal?
    */
-  width : PropTypes.number.isRequired,
+  widthHint : PropTypes.number.isRequired,
 
   /**
    * Top left corner.

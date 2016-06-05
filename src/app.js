@@ -180,7 +180,7 @@ window.onload = function () {
     let bottomRight = new Point({ lat : center.lat - d, lng : center.lng + d });
     ReactDOM.render(
       React.createElement('div', {},
-        React.createElement(BoundedMap, { width : 100, topLeft, bottomRight },
+        React.createElement(BoundedMap, { widthHint : 100, topLeft, bottomRight },
           React.createElement(TileLayer, { maxZoom : 17, minZoom : 0, tilePixels : 256, url : getTileUrl }),
           React.createElement(Disc, { center, radius : 50 }),
           React.createElement(Path, { w : 50, points })
