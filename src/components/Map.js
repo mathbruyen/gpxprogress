@@ -204,28 +204,33 @@ TileLayer.propTypes = {
   tilePixels : PropTypes.number.isRequired
 }
 
-class Disc extends Component {
+class SvgDrawing extends Component {
 
-  render() {
-    let { center, radius } = this.props;
-    let cx = lngToX(center.lng);
-    let cy = latToY(center.lat);
-    let r = metersToSize(radius);
-    return React.createElement('circle', { cx, cy, r, fill : 'red' });
+  render () {
+    let { origin, points, meters } = this.props;
+    let x = lngToX(origin.lng);
+    let y = latToY(origin.lat);
+    let scale = metersToSize(meters) / points;
+    let transform = `translate(${x} ${y}) scale(${scale} ${scale})`;
+    return React.createElement('g', { transform }, this.props.children);
   }
 
 }
 
-Disc.propTypes = {
+SvgDrawing.propTypes = {
   /**
-   * Disc center.
+   * Coordinates of the drawing origin.
    */
-  center : PropTypes.instanceOf(Point).isRequired,
+  origin : PropTypes.instanceOf(Point).isRequired,
 
   /**
-   * Radius of the disc in meters.
+   * Scaling the drawing: points in SVG coordinates correspond to meters in real display
+   *
+   * With { points : 100, meters : 50 } a SVG circle with r="100" will appear with a radius 50 meters on the map. If
+   * using { points : 100, meters : 1500 } the same circle will appear with a radius of 1500 meters.
    */
-  radius : PropTypes.number.isRequired
+  points : PropTypes.number.isRequired,
+  meters : PropTypes.number.isRequired
 }
 
 class Path extends Component {
@@ -266,4 +271,4 @@ Path.propTypes = {
   w : PropTypes.number.isRequired,
 }
 
-export { BoundedMap, TileLayer, Path, Disc, Point };
+export { BoundedMap, TileLayer, Path, SvgDrawing, Point };
