@@ -1,7 +1,8 @@
 import { createStore } from 'redux';
 import ReactDOM from 'react-dom';
 import React from 'react';
-import { BoundedMap, TileLayer, Path, SvgDrawing, Point } from './components/Map';
+import { BoundedMap, TileLayer, Path, Point } from './components/Map';
+import Marker from './components/Marker';
 import Immutable from 'immutable';
 
 require('./styles/app.css');
@@ -182,9 +183,7 @@ window.onload = function () {
       React.createElement('div', {},
         React.createElement(BoundedMap, { widthHint : 100, topLeft, bottomRight },
           React.createElement(TileLayer, { maxZoom : 17, minZoom : 0, tilePixels : 256, url : getTileUrl }),
-          React.createElement(SvgDrawing, { origin : center, points : 100, meters : 50 },
-            React.createElement('circle', { r : 100, fill : 'red' })
-          ),
+          React.createElement(Marker, { position : center, meters : 5000 }),
           React.createElement(Path, { w : 50, points })
         ),
         React.createElement('button', { onClick : () => store.dispatch({ type: 'ZOOM_IN' }) }, '+'),

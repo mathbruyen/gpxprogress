@@ -36,6 +36,7 @@ function powerOf2(exponent) {
   return Math.round(Math.pow(2, exponent));
 }
 
+// TODO this should be latitude dependent
 function metersToSize(meters) {
   // Using longitude as basis: 2 * PI * EARTH_RADIUS -> RESOLUTION
   return meters * RESOLUTION / (EARTH_RADIUS * Math.PI * 2);
