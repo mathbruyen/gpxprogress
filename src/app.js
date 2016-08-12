@@ -167,7 +167,7 @@ function counter(state = new State(), action) {
 }
 
 function getTileUrl(zoom, x, y) {
-  return `https://blog.mais-h.eu/tiles/1.0.0/map/${zoom}/${x}/${y}.png`;
+  return `https://blog.mais-h.eu/tiles/${zoom}/${x}/${y}.png`;
 }
 
 const store = createStore(counter);

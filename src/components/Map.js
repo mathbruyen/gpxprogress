@@ -38,7 +38,7 @@ function powerOf2(exponent) {
 
 // TODO this should be latitude dependent
 function metersToSize(meters) {
-  // Using longitude as basis: 2 * PI * EARTH_RADIUS -> RESOLUTION
+  // Using equator as reference: 2 * PI * EARTH_RADIUS -> RESOLUTION
   return meters * RESOLUTION / (EARTH_RADIUS * Math.PI * 2);
 }
 
@@ -57,35 +57,14 @@ function getTilesRange(start, length, tiles) {
 
 const Point = Immutable.Record({ lat : 0, lng : 0 });
 
-class MapConfiguration {
-
-  constructor(topLeft, bottomRight, width) {
-    this.topLeftLng = topLeft.lng;
-    this.topLeftLat = topLeft.lat;
-    this.bottomRightLng = bottomRight.lng;
-    this.bottomRightLat = bottomRight.lat;
-
-    this.width = width;
-
-    this.topLeftX = lngToX(this.topLeftLng);
-    this.topLeftY = latToY(this.topLeftLat);
-    this.bottomRightX = lngToX(this.bottomRightLng);
-    this.bottomRightY = latToY(this.bottomRightLat);
-  }
-
-  get mapWidth() {
-    return this.bottomRightX - this.topLeftX;
-  }
-
-  get mapHeight() {
-    return this.bottomRightY - this.topLeftY;
-  }
-
-  get aspectRatio() {
-    return (this.bottomRightY - this.topLeftY) / (this.bottomRightX - this.topLeftX);
-  }
-
-}
+const MapConfiguration = Immutable.Record({
+  topLeftX : 0,
+  topLeftY : 0,
+  bottomRightX : 0,
+  bottomRightY : 0,
+  width : 0,
+  height : 0
+});
 
 /**
  * Map defined by its bounds (top-left and bottom-right corners)
@@ -97,15 +76,41 @@ class BoundedMap extends Component {
   render() {
     // Map configuration width actual size if already measured
     let { widthHint, topLeft, bottomRight, children } = this.props;
-    let width = (this.state && this.state.width) || widthHint;
-    let config = new MapConfiguration(topLeft, bottomRight, width);
 
+    let topLeftX = lngToX(topLeft.lng);
+    let topLeftY = latToY(topLeft.lat);
+    let bottomRightX = lngToX(bottomRight.lng);
+    let bottomRightY = latToY(bottomRight.lat);
+
+    let boundsAspectRatio = (bottomRightY - topLeftY) / (bottomRightX - topLeftX);
+
+    let width, height, pointsPerPixels;
+    if (this.state && this.state.width && this.state.height) {
+      // actual size measured in browser
+      width = this.state.width;
+      height = this.state.height;
+      let realAspectRatio = height / width;
+      if (realAspectRatio > boundsAspectRatio) {
+        // higher box than expected, increase latitudes
+        let increase = ((bottomRightX - topLeftX) * realAspectRatio - bottomRightY + topLeftY) / 2;
+        topLeftY -= increase;
+        bottomRightY += increase;
+      } else {
+        // wider box than expected, increase longitudes
+        let increase = ((bottomRightY - topLeftY) / realAspectRatio - bottomRightX + topLeftX) / 2;
+        topLeftX -= increase;
+        bottomRightX += increase;
+      }
+    } else {
+      // size as requested for static generation
+      width = widthHint;
+      height = widthHint * boundsAspectRatio;
+    }
+
+    let config =  new MapConfiguration({ topLeftX, topLeftY, bottomRightX, bottomRightY, width, height });
 
     // Displayed part coordinates
-    let viewBox = `${config.topLeftX} ${config.topLeftY} ${config.mapWidth} ${config.mapHeight}`;
-
-    // Physical height
-    let height = width * config.aspectRatio;
+    let viewBox = `${topLeftX} ${topLeftY} ${bottomRightX - topLeftX} ${bottomRightY - topLeftY}`;
 
     let configuredChildren = React.Children.map(children, (c) => React.cloneElement(c, { __mapConfig : config }));
     return React.createElement('svg', { width, height, viewBox }, configuredChildren);
@@ -122,9 +127,10 @@ class BoundedMap extends Component {
 
   __measure() {
     let node = ReactDOM.findDOMNode(this);
-    let style = window.getComputedStyle(node, null).getPropertyValue('width');
-    let measured = parseInt(style.substring(-2), 10);
-    this.setState({ width : measured });
+    let style = window.getComputedStyle(node, null);
+    let width = parseInt(style.getPropertyValue('width').substring(-2), 10);
+    let height = parseInt(style.getPropertyValue('height').substring(-2), 10);
+    this.setState({ width, height });
   }
 
 }
@@ -157,12 +163,12 @@ class TileLayer extends Component {
     let { url, tilePixels, minZoom, maxZoom, __mapConfig } = this.props;
 
     // Zoom 0 has a single tile for the whole world, each time zoom increases the x and y number of tiles doubles
-    let percent = (__mapConfig.bottomRightLng - __mapConfig.topLeftLng) / (2 * MAX_LONGITUDE);
+    let percent = (__mapConfig.bottomRightX - __mapConfig.topLeftX) / RESOLUTION;
     let zoom = Math.max(minZoom, Math.min(maxZoom, Math.ceil(log2(__mapConfig.width / (tilePixels * percent)))));
 
     let side = powerOf2(zoom);
-    let xRange = getTilesRange(__mapConfig.topLeftX, __mapConfig.mapWidth, side);
-    let yRange = getTilesRange(__mapConfig.topLeftY, __mapConfig.mapHeight, side);
+    let xRange = getTilesRange(__mapConfig.topLeftX, __mapConfig.bottomRightX - __mapConfig.topLeftX, side);
+    let yRange = getTilesRange(__mapConfig.topLeftY, __mapConfig.bottomRightY - __mapConfig.topLeftY, side);
 
     let tiles = [];
     let tileSize = RESOLUTION / side;
