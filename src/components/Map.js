@@ -1,8 +1,10 @@
 /**
  * Reactive/isomorphic maps.
  *
- * TODO: auto bounded map? (asking to its children for required bounds)
- * TODO: centered map?
+ * Beware that this is using [React context](https://facebook.github.io/react/docs/context.html) to pass map information
+ * to map items: intermediate layers must ensure their `shouldComponentUpdate` method returns `false` in case context
+ * key `mapConfig` changes, even though they do not use that context key (see
+ * [#2517](https://github.com/facebook/react/issues/2517)).
  */
 import React, { Component, PropTypes } from 'react';
 import Immutable from 'immutable';
@@ -66,6 +68,26 @@ const MapConfiguration = Immutable.Record({
   height : 0
 });
 
+class MapConfigurationHelper extends Component {
+
+  render() {
+    return React.createElement('g', {}, this.props.children);
+  }
+
+  getChildContext() {
+    return { mapConfig : this.props.mapConfig };
+  }
+
+}
+
+MapConfigurationHelper.propTypes = {
+  mapConfig : PropTypes.instanceOf(MapConfiguration).isRequired
+};
+
+MapConfigurationHelper.childContextTypes = {
+  mapConfig : PropTypes.instanceOf(MapConfiguration).isRequired
+};
+
 /**
  * Map defined by its bounds (top-left and bottom-right corners)
  *
@@ -107,13 +129,14 @@ class BoundedMap extends Component {
       height = widthHint * boundsAspectRatio;
     }
 
-    let config =  new MapConfiguration({ topLeftX, topLeftY, bottomRightX, bottomRightY, width, height });
+    let mapConfig = new MapConfiguration({ topLeftX, topLeftY, bottomRightX, bottomRightY, width, height });
 
     // Displayed part coordinates
     let viewBox = `${topLeftX} ${topLeftY} ${bottomRightX - topLeftX} ${bottomRightY - topLeftY}`;
 
-    let configuredChildren = React.Children.map(children, (c) => React.cloneElement(c, { __mapConfig : config }));
-    return React.createElement('svg', { width, height, viewBox }, configuredChildren);
+    return React.createElement('svg', { width, height, viewBox },
+      React.createElement(MapConfigurationHelper, { mapConfig }, children)
+    );
   }
 
   componentDidMount() {
@@ -154,21 +177,21 @@ BoundedMap.propTypes = {
    * Bottom right corner.
    */
   bottomRight : PropTypes.instanceOf(Point).isRequired
-}
+};
 
-// TODO manage tiles directly in map elements? (avoids having map injecting properties in its children)
 class TileLayer extends Component {
 
   render() {
-    let { url, tilePixels, minZoom, maxZoom, __mapConfig } = this.props;
+    let { url, tilePixels, minZoom, maxZoom } = this.props;
+    let mapConfig = this.context.mapConfig;
 
     // Zoom 0 has a single tile for the whole world, each time zoom increases the x and y number of tiles doubles
-    let percent = (__mapConfig.bottomRightX - __mapConfig.topLeftX) / RESOLUTION;
-    let zoom = Math.max(minZoom, Math.min(maxZoom, Math.ceil(log2(__mapConfig.width / (tilePixels * percent)))));
+    let percent = (mapConfig.bottomRightX - mapConfig.topLeftX) / RESOLUTION;
+    let zoom = Math.max(minZoom, Math.min(maxZoom, Math.ceil(log2(mapConfig.width / (tilePixels * percent)))));
 
     let side = powerOf2(zoom);
-    let xRange = getTilesRange(__mapConfig.topLeftX, __mapConfig.bottomRightX - __mapConfig.topLeftX, side);
-    let yRange = getTilesRange(__mapConfig.topLeftY, __mapConfig.bottomRightY - __mapConfig.topLeftY, side);
+    let xRange = getTilesRange(mapConfig.topLeftX, mapConfig.bottomRightX - mapConfig.topLeftX, side);
+    let yRange = getTilesRange(mapConfig.topLeftY, mapConfig.bottomRightY - mapConfig.topLeftY, side);
 
     let tiles = [];
     let tileSize = RESOLUTION / side;
@@ -209,7 +232,11 @@ TileLayer.propTypes = {
    * The size of a single tile (used to compute best zoom level).
    */
   tilePixels : PropTypes.number.isRequired
-}
+};
+
+TileLayer.contextTypes = {
+  mapConfig : PropTypes.instanceOf(MapConfiguration).isRequired
+};
 
 class SvgScaledDrawing extends Component {
 
@@ -238,15 +265,16 @@ SvgScaledDrawing.propTypes = {
    */
   points : PropTypes.number.isRequired,
   meters : PropTypes.number.isRequired
-}
+};
 
 class SvgFixedDrawing extends Component {
 
   render () {
-    let { origin, points, pixels, __mapConfig } = this.props;
+    let { origin, points, pixels } = this.props;
+    let mapConfig = this.context.mapConfig;
     let x = lngToX(origin.lng);
     let y = latToY(origin.lat);
-    let scale = (pixels * (__mapConfig.bottomRightX - __mapConfig.topLeftX)) / (points * __mapConfig.width);
+    let scale = (pixels * (mapConfig.bottomRightX - mapConfig.topLeftX)) / (points * mapConfig.width);
     let transform = `translate(${x} ${y}) scale(${scale} ${scale})`;
     return React.createElement('g', { transform }, this.props.children);
   }
@@ -267,7 +295,11 @@ SvgFixedDrawing.propTypes = {
    */
   points : PropTypes.number.isRequired,
   pixels : PropTypes.number.isRequired
-}
+};
+
+SvgFixedDrawing.contextTypes = {
+  mapConfig : PropTypes.instanceOf(MapConfiguration).isRequired
+};
 
 class Path extends Component {
 
@@ -305,6 +337,6 @@ Path.propTypes = {
    * Line width of the path in meters.
    */
   w : PropTypes.number.isRequired,
-}
+};
 
 export { BoundedMap, TileLayer, Path, SvgFixedDrawing, SvgScaledDrawing, Point };
