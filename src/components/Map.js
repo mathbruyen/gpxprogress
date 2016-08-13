@@ -211,7 +211,7 @@ TileLayer.propTypes = {
   tilePixels : PropTypes.number.isRequired
 }
 
-class SvgDrawing extends Component {
+class SvgScaledDrawing extends Component {
 
   render () {
     let { origin, points, meters } = this.props;
@@ -224,7 +224,7 @@ class SvgDrawing extends Component {
 
 }
 
-SvgDrawing.propTypes = {
+SvgScaledDrawing.propTypes = {
   /**
    * Coordinates of the drawing origin.
    */
@@ -238,6 +238,35 @@ SvgDrawing.propTypes = {
    */
   points : PropTypes.number.isRequired,
   meters : PropTypes.number.isRequired
+}
+
+class SvgFixedDrawing extends Component {
+
+  render () {
+    let { origin, points, pixels, __mapConfig } = this.props;
+    let x = lngToX(origin.lng);
+    let y = latToY(origin.lat);
+    let scale = (pixels * (__mapConfig.bottomRightX - __mapConfig.topLeftX)) / (points * __mapConfig.width);
+    let transform = `translate(${x} ${y}) scale(${scale} ${scale})`;
+    return React.createElement('g', { transform }, this.props.children);
+  }
+
+}
+
+SvgFixedDrawing.propTypes = {
+  /**
+   * Coordinates of the drawing origin.
+   */
+  origin : PropTypes.instanceOf(Point).isRequired,
+
+  /**
+   * Scaling the drawing: points in SVG coordinates correspond to pixels in final image
+   *
+   * With { points : 100, pixels : 50 } a SVG circle with r="100" will appear with a radius 50 pixels on the final
+   * image. If using { points : 100, pixels : 1500 } the same circle will appear with a radius of 1500 pixels.
+   */
+  points : PropTypes.number.isRequired,
+  pixels : PropTypes.number.isRequired
 }
 
 class Path extends Component {
@@ -278,4 +307,4 @@ Path.propTypes = {
   w : PropTypes.number.isRequired,
 }
 
-export { BoundedMap, TileLayer, Path, SvgDrawing, Point };
+export { BoundedMap, TileLayer, Path, SvgFixedDrawing, SvgScaledDrawing, Point };
