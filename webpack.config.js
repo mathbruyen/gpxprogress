@@ -9,6 +9,16 @@ function buildChunkName(base) {
   return (process.env.NODE_ENV === 'production') ? '[chunkhash].' + base : base;
 }
 
+var plugins = [
+  new webpack.optimize.CommonsChunkPlugin('vendor', buildChunkName('vendor.js')),
+  new ExtractTextPlugin(buildChunkName('app.css')),
+  new webpack.EnvironmentPlugin(['NODE_ENV']),
+  new HtmlWebpackPlugin({ template : 'src/index.html', inject : false })
+];
+if (process.env.NODE_ENV === 'production') {
+  plugins.push(new webpack.optimize.UglifyJsPlugin({ compress : { warnings : false }}));
+}
+
 /**
  * Packages all frontend sources
  *
@@ -40,11 +50,5 @@ module.exports = {
       loader: ExtractTextPlugin.extract('style-loader', 'css-loader')
     }]
   },
-  plugins: [
-    new webpack.optimize.CommonsChunkPlugin('vendor', buildChunkName('vendor.js')),
-    new ExtractTextPlugin(buildChunkName('app.css')),
-    new webpack.EnvironmentPlugin(['NODE_ENV']),
-    new webpack.optimize.UglifyJsPlugin({ compress : { warnings : false }}),
-    new HtmlWebpackPlugin({ template : 'src/index.html', inject : false })
-  ]
+  plugins: plugins
 };
