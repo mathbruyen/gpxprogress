@@ -1,7 +1,7 @@
 import { createStore } from 'redux';
 import ReactDOM from 'react-dom';
 import React from 'react';
-import { BoundedMap, TileLayer, Path, Point, SvgScaledDrawing } from './components/Map';
+import { Path, Point, SvgScaledDrawing } from './components/Map';
 import Marker from './components/Marker';
 import MapWithCredits from './components/MapWithCredits';
 import Immutable from 'immutable';
@@ -158,10 +158,11 @@ function counter(state = new State(), action) {
     return state.set('d', state.d / 2);
   case 'ZOOM_OUT':
     return state.set('d', state.d * 2);
-  case 'ADD_POINT':
+  case 'ADD_POINT': {
     let [lat, lng] = p[i++];
     let point = new Point({ lat, lng });
     return state.set('points', state.points.push(point));
+  }
   default:
     return state;
   }
@@ -185,9 +186,9 @@ window.onload = function () {
           ),
           React.createElement(Path, { w : 50, points })
         ),
-        React.createElement('button', { onClick : () => store.dispatch({ type: 'ZOOM_IN' }) }, '+'),
-        React.createElement('button', { onClick : () => store.dispatch({ type: 'ZOOM_OUT' }) }, '-'),
-        React.createElement('button', { onClick : () => store.dispatch({ type: 'ADD_POINT' }) }, 'Add point')
+        React.createElement('button', { onClick : () => store.dispatch({ type : 'ZOOM_IN' }) }, '+'),
+        React.createElement('button', { onClick : () => store.dispatch({ type : 'ZOOM_OUT' }) }, '-'),
+        React.createElement('button', { onClick : () => store.dispatch({ type : 'ADD_POINT' }) }, 'Add point')
       ),
       rootEl
     );

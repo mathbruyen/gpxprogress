@@ -1,0 +1,24 @@
+{
+  "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaVersion": 6,
+    "sourceType": "module"
+  },
+  "rules": {
+    "curly": ["error", "all"],
+    "eqeqeq": ["error", "always"],
+    "no-caller": ["error"],
+    "key-spacing":["error", {
+      "beforeColon": true,
+      "afterColon": true,
+      "mode": "strict"
+    }],
+    "object-curly-spacing": ["error", "always"],
+    "array-bracket-spacing": ["error", "never"],
+    "no-irregular-whitespace": ["off"]
+  },
+  "env": {
+    "browser": true,
+    "amd": true
+  }
+}

@@ -13,7 +13,6 @@ import ReactDOM from 'react-dom';
 require('../styles/map.css');
 
 const RESOLUTION = 10000000;
-const MAX_LATITUDE = 90;
 const MAX_LONGITUDE = 180;
 const EARTH_RADIUS = 6378137;
 
@@ -106,7 +105,7 @@ class BoundedMap extends Component {
 
     let boundsAspectRatio = (bottomRightY - topLeftY) / (bottomRightX - topLeftX);
 
-    let width, height, pointsPerPixels;
+    let width, height;
     if (this.state && this.state.width && this.state.height) {
       // actual size measured in browser
       width = this.state.width;
@@ -311,7 +310,7 @@ class Path extends Component {
     let d = points.map((point, idx) => {
       let x = lngToX(point.lng);
       let y = latToY(point.lat);
-      if (idx == 0) {
+      if (idx === 0) {
         return `M${x} ${y}`;
       } else {
         return `L${x} ${y}`;
