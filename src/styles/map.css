@@ -3,13 +3,3 @@ svg {
   width: 400px;
   height: auto;
 }
-.map {
-  display: inline-block;
-  position: relative;
-}
-.map > span {
-  text-align: right;
-  position: absolute;
-  bottom: 0;
-  right: 0;
-}

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import React from 'react';
 import { BoundedMap, TileLayer, Path, Point, SvgScaledDrawing } from './components/Map';
 import Marker from './components/Marker';
+import MapWithCredits from './components/MapWithCredits';
 import Immutable from 'immutable';
 
 require('./styles/app.css');
@@ -166,10 +167,6 @@ function counter(state = new State(), action) {
   }
 }
 
-function getTileUrl(zoom, x, y) {
-  return `https://blog.mais-h.eu/tiles/${zoom}/${x}/${y}.png`;
-}
-
 const store = createStore(counter);
 
 window.onload = function () {
@@ -181,20 +178,12 @@ window.onload = function () {
     let bottomRight = new Point({ lat : center.lat - d, lng : center.lng + d });
     ReactDOM.render(
       React.createElement('div', {},
-        React.createElement('div', { className : 'map' },
-          React.createElement(BoundedMap, { widthHint : 100, topLeft, bottomRight },
-            React.createElement(TileLayer, { maxZoom : 17, minZoom : 0, tilePixels : 256, url : getTileUrl }),
-            React.createElement(Marker, { position : center, pixels : 100 }),
-            React.createElement(SvgScaledDrawing, { origin : center, meters : 500, points : 100 },
-              React.createElement('circle', { r : 50, fill : 'red' })
-            ),
-            React.createElement(Path, { w : 50, points })
+        React.createElement(MapWithCredits, { topLeft, bottomRight },
+          React.createElement(Marker, { position : center, pixels : 100 }),
+          React.createElement(SvgScaledDrawing, { origin : center, meters : 500, points : 100 },
+            React.createElement('circle', { r : 50, fill : 'red' })
           ),
-          React.createElement('span', {},
-            'Map data © ',
-            React.createElement('a', { href : 'http://openstreetmap.org' }, 'OpenStreetMap'),
-            ' contributors'
-          )
+          React.createElement(Path, { w : 50, points })
         ),
         React.createElement('button', { onClick : () => store.dispatch({ type: 'ZOOM_IN' }) }, '+'),
         React.createElement('button', { onClick : () => store.dispatch({ type: 'ZOOM_OUT' }) }, '-'),
