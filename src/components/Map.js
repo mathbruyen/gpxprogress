@@ -134,7 +134,7 @@ class BoundedMap extends Component {
     // Displayed part coordinates
     let viewBox = `${topLeftX} ${topLeftY} ${bottomRightX - topLeftX} ${bottomRightY - topLeftY}`;
 
-    return React.createElement('svg', { width, height, viewBox },
+    return React.createElement('svg', { viewBox, preserveAspectRatio : 'xMidYMid slice' },
       React.createElement(MapConfigurationHelper, { mapConfig }, children)
     );
   }
