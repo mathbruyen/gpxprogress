@@ -2,6 +2,6 @@
 
 pkgs.stdenv.mkDerivation rec {
   name = "dev";
-  buildInputs = [ pkgs.nodejs-6_x ];
+  buildInputs = [ pkgs.nodejs-7_x ];
   src = ./src;
 }
