@@ -90,7 +90,8 @@ MapConfigurationHelper.childContextTypes = {
 class TileLoading extends Component {
 
   render() {
-    return React.createElement('circle', { cx : '0.5', cy : '0.5', r : '0.4', stroke: 'black', strokeWidth: '0.1', fill : 'red' });
+    // TODO can be better than a red circle
+    return React.createElement('circle', { r : 40, stroke: 'black', strokeWidth: 1, fill : 'red' });
   }
 }
 
@@ -98,7 +99,7 @@ class MapDefinitions extends Component {
 
   render() {
     return React.createElement('defs', null,
-      React.createElement('g', { id : 'TileLoading' }, React.createElement(TileLoading))
+      React.createElement('g', { id : 'TileLoading' }, React.createElement(this.props.tileLoading || TileLoading))
     );
   }
 }
@@ -150,7 +151,7 @@ class BoundedMap extends Component {
     let viewBox = `${topLeftX} ${topLeftY} ${bottomRightX - topLeftX} ${bottomRightY - topLeftY}`;
 
     return React.createElement('svg', { viewBox, preserveAspectRatio : 'xMidYMid slice' },
-      React.createElement(MapDefinitions),
+      React.createElement(MapDefinitions, { tileLoading : this.props.tileLoading }),
       React.createElement(MapConfigurationHelper, { mapConfig }, children)
     );
   }
@@ -192,7 +193,15 @@ BoundedMap.propTypes = {
   /**
    * Bottom right corner.
    */
-  bottomRight : PropTypes.instanceOf(Point).isRequired
+  bottomRight : PropTypes.instanceOf(Point).isRequired,
+
+  /**
+   * Loading indicator.
+   *
+   * This element is expected to render a 100 by 100 drawing centered on its origin, all coordinates must fit inside
+   * range [-50, 50].
+   */
+  tileLoading : React.PropTypes.element
 };
 
 class TileLayer extends Component {
@@ -220,6 +229,7 @@ class TileLayer extends Component {
       let x = (xidx * RESOLUTION / side) - (RESOLUTION / 2);
       for (let yidx = yRange[0]; yidx <= yRange[1]; yidx++) {
         let y = - (RESOLUTION / 2) + (yidx * RESOLUTION / side);
+        // TODO when changing zoom, display images which were already loaded (previous zoom) until new ones are instead of loading indicator
         tiles.push(React.createElement('image', {
           key : `${zoom}-${xidx}-${yidx}`,
           x, y,
@@ -246,7 +256,7 @@ class TileLayer extends Component {
           let y = image.getAttribute('y');
           let w = image.getAttribute('width');
           let h = image.getAttribute('height');
-          el.setAttribute('transform', `translate(${x} ${y}) scale(${w} ${h})`);
+          el.setAttribute('transform', `translate(${x} ${y}) scale(0.01) scale(${w} ${h}) translate(50 50)`);
           el.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '#TileLoading');
           this._loading[id] = el;
           image.parentNode.appendChild(el);
