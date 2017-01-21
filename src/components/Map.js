@@ -10,9 +10,9 @@ import React, { Component, PropTypes } from 'react';
 import Immutable from 'immutable';
 import ReactDOM from 'react-dom';
 
-require('../styles/map.css');
+import '../styles/map.css';
 
-const RESOLUTION = 10000000;
+const RESOLUTION = Math.pow(2, 20);
 const MAX_LONGITUDE = 180;
 const EARTH_RADIUS = 6378137;
 
@@ -87,6 +87,22 @@ MapConfigurationHelper.childContextTypes = {
   mapConfig : PropTypes.instanceOf(MapConfiguration).isRequired
 };
 
+class TileLoading extends Component {
+
+  render() {
+    return React.createElement('circle', { cx : '0.5', cy : '0.5', r : '0.4', stroke: 'black', strokeWidth: '0.1', fill : 'red' });
+  }
+}
+
+class MapDefinitions extends Component {
+
+  render() {
+    return React.createElement('defs', null,
+      React.createElement('g', { id : 'TileLoading' }, React.createElement(TileLoading))
+    );
+  }
+}
+
 /**
  * Map defined by its bounds (top-left and bottom-right corners)
  *
@@ -134,6 +150,7 @@ class BoundedMap extends Component {
     let viewBox = `${topLeftX} ${topLeftY} ${bottomRightX - topLeftX} ${bottomRightY - topLeftY}`;
 
     return React.createElement('svg', { viewBox, preserveAspectRatio : 'xMidYMid slice' },
+      React.createElement(MapDefinitions),
       React.createElement(MapConfigurationHelper, { mapConfig }, children)
     );
   }
@@ -180,6 +197,11 @@ BoundedMap.propTypes = {
 
 class TileLayer extends Component {
 
+  constructor(props) {
+    super(props);
+    this._loading = {};
+  }
+
   render() {
     let { url, tilePixels, minZoom, maxZoom } = this.props;
     let mapConfig = this.context.mapConfig;
@@ -202,11 +224,49 @@ class TileLayer extends Component {
           key : `${zoom}-${xidx}-${yidx}`,
           x, y,
           width : tileSize, height : tileSize,
-          xlinkHref : url(zoom, xidx, yidx)
+          xlinkHref : url(zoom, xidx, yidx),
+          ref : this.imageRef.bind(this, `${zoom}-${xidx}-${yidx}`)
         }));
       }
     }
     return React.createElement('g', {}, tiles);
+  }
+
+  /**
+   * Display loading indicator, only if image load takes more than a frame.
+   */
+  imageRef(id, image) {
+    this.clearImageRef(id);
+    if (image) {
+      this._loading[id] = 'prepared';
+      let time = setTimeout(() => {
+        if (this._loading[id] === 'prepared') {
+          let el = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+          let x = image.getAttribute('x');
+          let y = image.getAttribute('y');
+          let w = image.getAttribute('width');
+          let h = image.getAttribute('height');
+          el.setAttribute('transform', `translate(${x} ${y}) scale(${w} ${h})`);
+          el.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '#TileLoading');
+          this._loading[id] = el;
+          image.parentNode.appendChild(el);
+          image.onload = () => this.imageRef(id);
+        } else {
+          this.clearImageRef(id);
+        }
+      }, 60);
+      image.onload = () => clearTimeout(time);
+    }
+  }
+
+  clearImageRef(id) {
+    if (this._loading[id]) {
+      let el = this._loading[id];
+      delete this._loading[id];
+      if (el.parentNode) {
+        el.parentNode.removeChild(el);
+      }
+    }
   }
 
 }
