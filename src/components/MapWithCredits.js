@@ -2,7 +2,7 @@ import React, { Component, PropTypes } from 'react';
 
 import { BoundedMap, TileLayer, Point } from './Map';
 
-require('../styles/mapWithCredits.css');
+import styles from '../styles/mapWithCredits.css';
 
 function getTileUrl(zoom, x, y) {
   return `https://blog.mais-h.eu/tiles/${zoom}/${x}/${y}.png`;
@@ -12,7 +12,7 @@ class MapWithCredits extends Component {
 
   render() {
     let { topLeft, bottomRight, children } = this.props;
-    return React.createElement('div', { className : 'map' },
+    return React.createElement('div', { className : styles.map },
       React.createElement(BoundedMap, { widthHint : 100, topLeft, bottomRight },
         React.createElement(TileLayer, { maxZoom : 17, minZoom : 0, tilePixels : 256, url : getTileUrl }),
         children

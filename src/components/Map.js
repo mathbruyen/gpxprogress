@@ -10,7 +10,7 @@ import React, { Component, PropTypes } from 'react';
 import Immutable from 'immutable';
 import ReactDOM from 'react-dom';
 
-import '../styles/map.css';
+import styles from '../styles/map.css';
 
 const RESOLUTION = Math.pow(2, 20);
 const MAX_LONGITUDE = 180;
@@ -90,9 +90,15 @@ MapConfigurationHelper.childContextTypes = {
 class TileLoading extends Component {
 
   render() {
-    // TODO can be better than a red circle
-    return React.createElement('circle', { r : 40, stroke: 'black', strokeWidth: 1, fill : 'red' });
+    return React.createElement('g', {},
+      React.createElement('circle', { className : styles.loading, style : { animationDelay : '0.1s' }, r : 2, fill : 'black' }),
+      React.createElement('circle', { className : styles.loading, style : { animationDelay : '0.3s' }, r : 2, fill : 'black' }),
+      React.createElement('circle', { className : styles.loading, style : { animationDelay : '0.5s' }, r : 2, fill : 'black' }),
+      React.createElement('circle', { className : styles.loading, style : { animationDelay : '0.7s' }, r : 2, fill : 'black' }),
+      React.createElement('circle', { className : styles.loading, style : { animationDelay : '0.9s' }, r : 2, fill : 'black' })
+    );
   }
+
 }
 
 class MapDefinitions extends Component {
@@ -248,24 +254,16 @@ class TileLayer extends Component {
   imageRef(id, image) {
     this.clearImageRef(id);
     if (image) {
-      this._loading[id] = 'prepared';
-      let time = setTimeout(() => {
-        if (this._loading[id] === 'prepared') {
-          let el = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-          let x = image.getAttribute('x');
-          let y = image.getAttribute('y');
-          let w = image.getAttribute('width');
-          let h = image.getAttribute('height');
-          el.setAttribute('transform', `translate(${x} ${y}) scale(0.01) scale(${w} ${h}) translate(50 50)`);
-          el.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '#TileLoading');
-          this._loading[id] = el;
-          image.parentNode.appendChild(el);
-          image.onload = () => this.imageRef(id);
-        } else {
-          this.clearImageRef(id);
-        }
-      }, 60);
-      image.onload = () => clearTimeout(time);
+      let el = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+      let x = image.getAttribute('x');
+      let y = image.getAttribute('y');
+      let w = image.getAttribute('width');
+      let h = image.getAttribute('height');
+      el.setAttribute('transform', `translate(${x} ${y}) scale(0.01) scale(${w} ${h}) translate(50 50)`);
+      el.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '#TileLoading');
+      this._loading[id] = el;
+      image.parentNode.appendChild(el);
+      image.onload = () => this.imageRef(id);
     }
   }
 

@@ -2,6 +2,11 @@
   display: inline-block;
   position: relative;
 }
+.map > svg {
+  box-shadow: 3px 2px 8px #BBB;
+  width: 400px;
+  height: auto;
+}
 .map > span {
   text-align: right;
   position: absolute;

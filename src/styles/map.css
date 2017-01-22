@@ -1,5 +1,22 @@
-svg {
-  box-shadow: 3px 2px 8px #BBB;
-  width: 400px;
-  height: auto;
+.loading {
+  opacity: 0;
+  animation-name: loading;
+  animation-duration: 2s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes loading {
+  0% {
+    opacity: 0;
+    transform: rotate(0deg) translateX(0pt);
+  }
+  50% {
+    opacity: 0.9;
+    transform: rotate(270deg) translateX(40px);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(540deg) translateX(0pt);
+  }
 }
